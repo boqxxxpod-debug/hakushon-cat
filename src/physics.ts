@@ -7,6 +7,24 @@ export const CAT_R = 25;
 export const BOX_HALF = 21;
 export const MAX_AIM_DISTANCE = 120;
 
+export type LevelId = 1 | 2;
+
+export type Obstacle = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type LevelDefinition = {
+  id: LevelId;
+  cat: Pick<Body, "x" | "y">;
+  box: Pick<Body, "x" | "y">;
+  goal: { left: number; right: number; top: number; bottom: number };
+  obstacles: Obstacle[];
+  hint: string;
+};
+
 export type PlayStatus = "playing" | "won" | "failed";
 
 export type Body = {
@@ -17,8 +35,10 @@ export type Body = {
 };
 
 export type PhysicsState = {
+  level: LevelId;
   cat: Body;
   box: Body;
+  obstacles: Obstacle[];
   goalHold: number;
 };
 
@@ -36,10 +56,36 @@ export type SneezeState = {
   power: number;
 };
 
-export function freshPhysics(): PhysicsState {
+export const LEVELS: Record<LevelId, LevelDefinition> = {
+  1: {
+    id: 1,
+    cat: { x: 225, y: FLOOR_Y - CAT_R },
+    box: { x: 292, y: FLOOR_Y - BOX_HALF },
+    goal: { left: 43, right: 143, top: 486, bottom: 522 },
+    obstacles: [],
+    hint: "右へ くしゃみ！",
+  },
+  2: {
+    id: 2,
+    cat: { x: 82, y: FLOOR_Y - CAT_R },
+    box: { x: 148, y: FLOOR_Y - BOX_HALF },
+    goal: { left: 245, right: 333, top: 486, bottom: 522 },
+    obstacles: [{ x: 194, y: FLOOR_Y - 106, width: 34, height: 106 }],
+    hint: "箱を動かし 壁をこえよう！",
+  },
+};
+
+export function nextLevel(level: LevelId): LevelId | null {
+  return level === 1 ? 2 : null;
+}
+
+export function freshPhysics(level: LevelId = 1): PhysicsState {
+  const definition = LEVELS[level];
   return {
-    cat: { x: 225, y: FLOOR_Y - CAT_R, vx: 0, vy: 0 },
-    box: { x: 292, y: FLOOR_Y - BOX_HALF, vx: 0, vy: 0 },
+    level,
+    cat: { ...definition.cat, vx: 0, vy: 0 },
+    box: { ...definition.box, vx: 0, vy: 0 },
+    obstacles: definition.obstacles.map((obstacle) => ({ ...obstacle })),
     goalHold: 0,
   };
 }
@@ -65,13 +111,14 @@ export function sneezeVelocity(dirX: number, dirY: number, power: number) {
   };
 }
 
-export function isRestingOnCushion(cat: Body) {
+export function isRestingOnCushion(cat: Body, level: LevelId = 1) {
   const speed = Math.hypot(cat.vx, cat.vy);
+  const goal = LEVELS[level].goal;
   return (
-    cat.x >= 43 &&
-    cat.x <= 143 &&
-    cat.y >= 486 &&
-    cat.y <= 522 &&
+    cat.x >= goal.left &&
+    cat.x <= goal.right &&
+    cat.y >= goal.top &&
+    cat.y <= goal.bottom &&
     speed < 42
   );
 }
