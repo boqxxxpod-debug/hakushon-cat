@@ -1,0 +1,32 @@
+name: Ensure automation labels
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create or update automation labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh label create codex \
+            --repo "$REPOSITORY" \
+            --color "1D76DB" \
+            --description "Autonomous development queue" \
+            --force
+          gh label create manual-review \
+            --repo "$REPOSITORY" \
+            --color "D93F0B" \
+            --description "Requires human review and must not auto-merge" \
+            --force

@@ -1,0 +1,29 @@
+name: Codex product task
+description: Issue 駆動の自動開発キューへ製品変更を追加します
+title: "[product] "
+labels: [codex]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 変更内容
+      description: 利用者から見える成果を簡潔に記載してください。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 受け入れ条件
+      description: 検証可能な箇条書きで記載してください。
+      placeholder: |
+        - [ ] 条件1
+        - [ ] 条件2
+    validations:
+      required: true
+  - type: textarea
+    id: mobile
+    attributes:
+      label: モバイルへの影響
+      description: タッチ操作、縦画面、Android 9 世代への影響を記載してください。
+    validations:
+      required: true

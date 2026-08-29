@@ -1,0 +1,67 @@
+name: Codex merge eligibility
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  eligibility:
+    if: startsWith(github.head_ref, 'codex/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check safe automation boundary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.repository }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            echo "Draft PRs are not eligible."
+            exit 1
+          fi
+
+          if [[ "$HEAD_REPOSITORY" != "$BASE_REPOSITORY" ]]; then
+            echo "Fork PRs are not eligible."
+            exit 1
+          fi
+
+          labels="$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER" --jq '[.labels[].name]')"
+          if ! jq -e 'index("codex") != null' <<<"$labels" >/dev/null; then
+            echo "The codex label is required."
+            exit 1
+          fi
+          if jq -e 'index("manual-review") != null' <<<"$labels" >/dev/null; then
+            echo "manual-review blocks automation."
+            exit 1
+          fi
+
+          body="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" --jq '.body // ""')"
+          if ! grep -Eiq '(close[sd]?|fix(e[sd])?|resolve[sd]?) +#[0-9]+' <<<"$body"; then
+            echo "PR body must close a linked Issue."
+            exit 1
+          fi
+
+          protected='^(\.github/|AGENTS\.md$|STATE\.md$|CODEOWNERS$|package(-lock)?\.json$|tsconfig[^/]*\.json$|vite\.config\.)'
+          changed="$(gh api --paginate "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --jq '.[].filename')"
+          if grep -Eq "$protected" <<<"$changed"; then
+            echo "Protected infrastructure files require manual review:"
+            grep -E "$protected" <<<"$changed"
+            exit 1
+          fi
+
+          echo "Eligible boundary checks passed for exact head SHA: $HEAD_SHA"
