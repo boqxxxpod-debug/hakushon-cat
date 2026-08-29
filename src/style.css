@@ -132,6 +132,12 @@ button { font: inherit; }
   margin-top: 14px;
 }
 
+.action-buttons {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -171,6 +177,24 @@ button { font: inherit; }
   cursor: pointer;
 }
 
+.next-button {
+  min-height: 42px;
+  border: 2px solid #26334d;
+  border-radius: 14px;
+  background: #f6bc32;
+  padding: 0 14px;
+  color: #26334d;
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: 3px 3px 0 #26334d;
+  cursor: pointer;
+}
+
+.next-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #26334d;
+}
+
 .restart-button:hover { background: #33415f; }
 
 .restart-button:active {
@@ -197,7 +221,10 @@ button { font: inherit; }
   .eyebrow { font-size: 9px; }
   .shot-counter { min-width: 62px; padding-inline: 8px; }
   .controls-row { align-items: flex-start; }
+  .controls-row { flex-direction: column; }
+  .action-buttons { width: 100%; }
   .restart-button { padding-inline: 14px; }
+  .next-button { flex: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
