@@ -4,6 +4,7 @@ import {
   BOX_HALF,
   CAT_R,
   FLOOR_Y,
+  LEVELS,
   LEFT_WALL,
   MAX_AIM_DISTANCE,
   RIGHT_WALL,
@@ -13,10 +14,13 @@ import {
   clamp,
   freshPhysics,
   isRestingOnCushion,
+  nextLevel,
   powerForDistance,
   sneezeVelocity,
   type AimState,
   type Body,
+  type LevelId,
+  type Obstacle,
   type PhysicsState,
   type PlayStatus,
   type SneezeState,
@@ -73,6 +77,7 @@ function drawArrow(
 }
 
 export default function Home() {
+  const levelRef = useRef<LevelId>(1);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const physicsRef = useRef<PhysicsState>(freshPhysics());
   const aimRef = useRef<AimState>({ active: false, pointerId: -1, x: 0, y: 0 });
@@ -84,9 +89,25 @@ export default function Home() {
   const shotsRef = useRef(0);
   const [status, setStatus] = useState<PlayStatus>("playing");
   const [shots, setShots] = useState(0);
+  const [level, setLevel] = useState<LevelId>(1);
 
   const resetGame = useCallback(() => {
-    physicsRef.current = freshPhysics();
+    physicsRef.current = freshPhysics(levelRef.current);
+    aimRef.current.active = false;
+    sneezeRef.current = null;
+    cooldownUntilRef.current = 0;
+    statusRef.current = "playing";
+    shotsRef.current = 0;
+    setStatus("playing");
+    setShots(0);
+  }, []);
+
+  const startNextLevel = useCallback(() => {
+    const following = nextLevel(levelRef.current);
+    if (following === null) return;
+    levelRef.current = following;
+    setLevel(following);
+    physicsRef.current = freshPhysics(following);
     aimRef.current.active = false;
     sneezeRef.current = null;
     cooldownUntilRef.current = 0;
@@ -174,6 +195,32 @@ export default function Home() {
       }
     };
 
+    const resolveBodyObstacle = (body: Body, radius: number, obstacle: Obstacle) => {
+      const nearestX = clamp(body.x, obstacle.x, obstacle.x + obstacle.width);
+      const nearestY = clamp(body.y, obstacle.y, obstacle.y + obstacle.height);
+      let dx = body.x - nearestX;
+      let dy = body.y - nearestY;
+      const distance = Math.hypot(dx, dy);
+      if (distance >= radius) return;
+      if (distance < 0.001) {
+        const left = Math.abs(body.x - obstacle.x);
+        const right = Math.abs(obstacle.x + obstacle.width - body.x);
+        dx = left < right ? -1 : 1;
+        dy = 0;
+      } else {
+        dx /= distance;
+        dy /= distance;
+      }
+      const overlap = radius - distance;
+      body.x += dx * overlap;
+      body.y += dy * overlap;
+      const intoSurface = body.vx * dx + body.vy * dy;
+      if (intoSurface < 0) {
+        body.vx -= intoSurface * dx * 1.18;
+        body.vy -= intoSurface * dy * 1.18;
+      }
+    };
+
     const step = (dt: number) => {
       if (statusRef.current !== "playing") return;
       const world = physicsRef.current;
@@ -188,13 +235,17 @@ export default function Home() {
       collideWithFloorAndWalls(world.cat, CAT_R, 850, dt);
       collideWithFloorAndWalls(world.box, BOX_HALF, 520, dt);
       resolveCatBox(world);
+      for (const obstacle of world.obstacles) {
+        resolveBodyObstacle(world.cat, CAT_R, obstacle);
+        resolveBodyObstacle(world.box, BOX_HALF, obstacle);
+      }
 
       if (sneezeRef.current) {
         sneezeRef.current.age += dt;
         if (sneezeRef.current.age > 0.42) sneezeRef.current = null;
       }
 
-      const restingOnCushion = isRestingOnCushion(world.cat);
+      const restingOnCushion = isRestingOnCushion(world.cat, world.level);
       world.goalHold = restingOnCushion ? world.goalHold + dt : 0;
       if (world.goalHold >= 0.6) {
         statusRef.current = "won";
@@ -257,6 +308,7 @@ export default function Home() {
 
     const draw = () => {
       const world = physicsRef.current;
+      const definition = LEVELS[world.level];
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
       const background = ctx.createLinearGradient(0, 0, 0, WORLD_H);
@@ -275,11 +327,11 @@ export default function Home() {
       ctx.font = "700 18px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText("LEVEL 1", 43, 45);
+      ctx.fillText(`LEVEL ${world.level}`, 43, 45);
       ctx.fillStyle = "#b7c2d8";
       ctx.font = "700 12px system-ui, sans-serif";
       ctx.textAlign = "right";
-      ctx.fillText("右へ くしゃみ！", 316, 45);
+      ctx.fillText(definition.hint, 316, 45);
 
       ctx.fillStyle = "#d5aa76";
       ctx.fillRect(LEFT_WALL, FLOOR_Y, RIGHT_WALL - LEFT_WALL, 50);
@@ -291,18 +343,32 @@ export default function Home() {
       ctx.save();
       ctx.shadowColor = "rgba(52, 110, 80, .2)";
       ctx.shadowBlur = 10;
-      roundedRect(ctx, 38, 511, 108, 31, 15);
+      const goalX = definition.goal.left - 5;
+      const goalWidth = definition.goal.right - definition.goal.left + 10;
+      roundedRect(ctx, goalX, 511, goalWidth, 31, 15);
       ctx.fillStyle = "#8cd7ab";
       ctx.fill();
       ctx.restore();
       ctx.strokeStyle = "#3f9a6a";
       ctx.lineWidth = 3;
-      roundedRect(ctx, 38, 511, 108, 31, 15);
+      roundedRect(ctx, goalX, 511, goalWidth, 31, 15);
       ctx.stroke();
       ctx.fillStyle = "#28794f";
       ctx.font = "800 11px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("おひるね", 92, 527);
+      ctx.fillText("おひるね", goalX + goalWidth / 2, 527);
+
+      for (const obstacle of world.obstacles) {
+        ctx.fillStyle = "#66748d";
+        ctx.strokeStyle = "#28344f";
+        ctx.lineWidth = 4;
+        roundedRect(ctx, obstacle.x, obstacle.y, obstacle.width, obstacle.height, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.22)";
+        roundedRect(ctx, obstacle.x + 7, obstacle.y + 9, 7, obstacle.height - 18, 4);
+        ctx.fill();
+      }
 
       ctx.save();
       ctx.translate(world.box.x, world.box.y);
@@ -381,19 +447,19 @@ export default function Home() {
       if (statusRef.current === "won") {
         ctx.fillStyle = "rgba(22, 31, 52, .42)";
         ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-        roundedRect(ctx, 42, 235, 276, 146, 28);
+        roundedRect(ctx, 42, 221, 276, 160, 28);
         ctx.fillStyle = "#fffaf0";
         ctx.fill();
         ctx.fillStyle = "#28344f";
         ctx.textAlign = "center";
         ctx.font = "900 30px system-ui, sans-serif";
-        ctx.fillText("おひるね成功！", 180, 286);
+        ctx.fillText("おひるね成功！", 180, 270);
         ctx.font = "700 17px system-ui, sans-serif";
         ctx.fillStyle = "#647086";
-        ctx.fillText("反動でクッションに到着", 180, 324);
+        ctx.fillText(world.level === 1 ? "つぎは障害物をこえよう" : "全レベル クリア！", 180, 310);
         ctx.fillStyle = "#f2a94b";
         ctx.font = "900 25px system-ui, sans-serif";
-        ctx.fillText("Z z z ...", 180, 355);
+        ctx.fillText("Z z z ...", 180, 345);
       }
     };
 
@@ -486,7 +552,7 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="game-stage" aria-label="ハクション・キャット Level 1">
+        <section className="game-stage" aria-label={`ハクション・キャット Level ${level}`}>
           <canvas
             ref={canvasRef}
             className="game-canvas"
@@ -506,9 +572,16 @@ export default function Home() {
             <span><i className="wind-dot" />青：風</span>
             <span><i className="recoil-dot" />黄：反動</span>
           </div>
-          <button className="restart-button" type="button" onClick={resetGame}>
-            {status === "won" ? "もう一度" : "リスタート"}
-          </button>
+          <div className="action-buttons">
+            <button className="restart-button" type="button" onClick={resetGame}>
+              {status === "won" ? "もう一度" : "リスタート"}
+            </button>
+            {status === "won" && nextLevel(level) !== null ? (
+              <button className="next-button" type="button" onClick={startNextLevel}>
+                つぎのレベル
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <p className="game-tip">ネコは歩けません。くしゃみの向きと逆へ飛びます。</p>
