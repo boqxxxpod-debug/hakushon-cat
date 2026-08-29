@@ -1,0 +1,205 @@
+:root {
+  --background: #f0dfbc;
+  --foreground: #26334d;
+  --card: #fffaf0;
+  --card-foreground: #26334d;
+  --popover: #fffaf0;
+  --popover-foreground: #26334d;
+  --primary: #26334d;
+  --primary-foreground: #fffaf0;
+  --secondary: #f6bc32;
+  --secondary-foreground: #26334d;
+  --muted: #ead9b8;
+  --muted-foreground: #657086;
+  --accent: #8cd7ab;
+  --accent-foreground: #214d39;
+  --destructive: #d94b52;
+  --border: #cfb98f;
+  --input: #cfb98f;
+  --ring: #2aa8ef;
+  --radius: 0.9rem;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  min-width: 320px;
+  background: #e7cda0;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, canvas { -webkit-tap-highlight-color: transparent; }
+button { font: inherit; }
+
+.game-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: start center;
+  padding: 12px;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 14% 8%, rgba(255,255,255,.72) 0 72px, transparent 73px),
+    radial-gradient(circle at 90% 18%, rgba(255,255,255,.34) 0 110px, transparent 111px),
+    linear-gradient(165deg, #fff0cb 0%, #ead1a5 100%);
+}
+
+.game-shell { width: min(100%, 390px); }
+
+.game-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 3px 10px;
+}
+
+.eyebrow {
+  margin: 0 0 3px;
+  color: #7a6548;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.game-header h1 {
+  margin: 0;
+  color: #26334d;
+  font-size: clamp(23px, 7vw, 30px);
+  font-weight: 950;
+  letter-spacing: -.055em;
+  line-height: 1;
+}
+
+.shot-counter {
+  min-width: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 2px solid #26334d;
+  border-radius: 999px;
+  background: #fffaf0;
+  box-shadow: 3px 3px 0 #26334d;
+}
+
+.shot-counter span { font-size: 10px; font-weight: 800; }
+.shot-counter strong { color: #e87936; font-size: 20px; line-height: 1; }
+
+.game-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 3px solid #26334d;
+  border-radius: 26px;
+  background: #fff9e8;
+  box-shadow: 7px 8px 0 rgba(38, 51, 77, .98), 0 18px 45px rgba(95, 68, 40, .18);
+}
+
+.game-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9 / 16;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.game-canvas:active { cursor: grabbing; }
+
+.status-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  color: #59657c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.wind-dot { background: #2aa8ef; }
+.recoil-dot { background: #f6bc32; }
+
+.restart-button {
+  height: 42px;
+  flex: 0 0 auto;
+  border: 2px solid #26334d;
+  border-radius: 14px;
+  background: #26334d;
+  padding: 0 19px;
+  color: #fffaf0;
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: 3px 3px 0 #f6bc32;
+  transition: transform .12s ease, box-shadow .12s ease;
+  cursor: pointer;
+}
+
+.restart-button:hover { background: #33415f; }
+
+.restart-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #f6bc32;
+}
+
+.game-tip {
+  margin: 11px 2px 0;
+  color: #6c604e;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.55;
+  text-align: center;
+}
+
+@media (min-width: 720px) {
+  .game-page { align-items: center; padding-block: 28px; }
+}
+
+@media (max-width: 350px) {
+  .game-page { padding: 8px; }
+  .game-header h1 { font-size: 22px; }
+  .eyebrow { font-size: 9px; }
+  .shot-counter { min-width: 62px; padding-inline: 8px; }
+  .controls-row { align-items: flex-start; }
+  .restart-button { padding-inline: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .restart-button { transition: none; }
+}
