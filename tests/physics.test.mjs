@@ -3,9 +3,11 @@ import test from "node:test";
 import {
   CAT_R,
   FLOOR_Y,
+  LEVELS,
   MAX_AIM_DISTANCE,
   freshPhysics,
   isRestingOnCushion,
+  nextLevel,
   powerForDistance,
   sneezeVelocity,
 } from "../src/physics.ts";
@@ -15,7 +17,27 @@ test("freshPhysics creates the intended level-one layout", () => {
 
   assert.deepEqual(world.cat, { x: 225, y: FLOOR_Y - CAT_R, vx: 0, vy: 0 });
   assert.equal(world.box.x, 292);
+  assert.equal(world.level, 1);
+  assert.deepEqual(world.obstacles, []);
   assert.equal(world.goalHold, 0);
+});
+
+test("level two has a distinct deterministic layout with a box and fixed obstacle", () => {
+  const first = freshPhysics(2);
+  const second = freshPhysics(2);
+
+  assert.deepEqual(first, second);
+  assert.equal(first.level, 2);
+  assert.notDeepEqual(first.cat, freshPhysics(1).cat);
+  assert.equal(first.obstacles.length, 1);
+  assert.ok(first.box.x < first.obstacles[0].x);
+});
+
+test("level progression stops after level two and restart preserves the current level", () => {
+  assert.equal(nextLevel(1), 2);
+  assert.equal(nextLevel(2), null);
+  assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
+  assert.deepEqual(freshPhysics(2), freshPhysics(2));
 });
 
 test("power is clamped between minimum and maximum", () => {
@@ -38,4 +60,7 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 2, vy: 1 }), true);
   assert.equal(isRestingOnCushion({ x: 160, y: 520, vx: 0, vy: 0 }), false);
   assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 43, vy: 0 }), false);
+  assert.equal(isRestingOnCushion({ x: 285, y: 520, vx: 2, vy: 1 }, 2), true);
+  assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 2, vy: 1 }, 2), false);
+  assert.ok(LEVELS[2].goal.left > LEVELS[1].goal.right);
 });
