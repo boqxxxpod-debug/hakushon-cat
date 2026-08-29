@@ -1,7 +1,8 @@
 # Autonomous Development State
 
 - State: `enabled`
-- Control issue: `#1` (`[automation-control] Autonomous development loop`)
+- Bootstrap issue: `#1` (`[bootstrap] GitHub PagesとIssue駆動開発基盤を構築`)
+- Control issue: `#3` (`[automation-control] Autonomous development loop`)
 - Active issue: `none`
 - Successful product merges: `0 / 10`
 - Queue policy: open かつ `codex` ラベル付き Issue を番号の小さい順に1件ずつ処理
