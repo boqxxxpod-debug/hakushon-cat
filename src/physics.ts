@@ -6,6 +6,7 @@ export const RIGHT_WALL = 342;
 export const CAT_R = 25;
 export const BOX_HALF = 21;
 export const MAX_AIM_DISTANCE = 120;
+export const CAT_GROUND_FRICTION = 1500;
 
 export type LevelId = 1 | 2;
 
@@ -98,6 +99,10 @@ export function approach(value: number, target: number, amount: number) {
   if (value < target) return Math.min(value + amount, target);
   if (value > target) return Math.max(value - amount, target);
   return target;
+}
+
+export function applyGroundFriction(velocityX: number, dt: number) {
+  return approach(velocityX, 0, CAT_GROUND_FRICTION * dt);
 }
 
 export function powerForDistance(distance: number) {
