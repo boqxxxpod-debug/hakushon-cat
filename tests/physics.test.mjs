@@ -5,12 +5,27 @@ import {
   FLOOR_Y,
   LEVELS,
   MAX_AIM_DISTANCE,
+  applyGroundFriction,
   freshPhysics,
   isRestingOnCushion,
   nextLevel,
   powerForDistance,
   sneezeVelocity,
 } from "../src/physics.ts";
+
+test("ground friction stops maximum horizontal recoil within about 0.35 seconds", () => {
+  let velocity = 530;
+  let elapsed = 0;
+
+  while (velocity > 0 && elapsed < 1) {
+    velocity = applyGroundFriction(velocity, 1 / 60);
+    elapsed += 1 / 60;
+  }
+
+  assert.equal(velocity, 0);
+  assert.ok(elapsed >= 0.3 && elapsed <= 0.4);
+  assert.equal(applyGroundFriction(-100, 1 / 60), -75);
+});
 
 test("freshPhysics creates the intended level-one layout", () => {
   const world = freshPhysics();
