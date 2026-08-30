@@ -10,6 +10,7 @@ import {
   RIGHT_WALL,
   WORLD_H,
   WORLD_W,
+  applyGroundFriction,
   approach,
   clamp,
   freshPhysics,
@@ -232,7 +233,10 @@ export default function Home() {
         body.y += body.vy * dt;
       }
 
-      collideWithFloorAndWalls(world.cat, CAT_R, 850, dt);
+      collideWithFloorAndWalls(world.cat, CAT_R, 0, dt);
+      if (world.cat.y >= FLOOR_Y - CAT_R - 0.5) {
+        world.cat.vx = applyGroundFriction(world.cat.vx, dt);
+      }
       collideWithFloorAndWalls(world.box, BOX_HALF, 520, dt);
       resolveCatBox(world);
       for (const obstacle of world.obstacles) {
