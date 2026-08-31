@@ -124,6 +124,74 @@ button { font: inherit; }
   white-space: nowrap;
 }
 
+.win-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(22, 31, 52, .42);
+}
+
+.win-card {
+  width: min(100%, 276px);
+  border-radius: 28px;
+  background: #fffaf0;
+  padding: 24px 20px 20px;
+  text-align: center;
+  box-shadow: 0 16px 36px rgba(22, 31, 52, .24);
+}
+
+.win-card h2 {
+  margin: 0;
+  color: #28344f;
+  font-size: 30px;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.win-card p {
+  margin: 10px 0 0;
+  color: #647086;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.win-sleep {
+  display: block;
+  margin: 9px 0 16px;
+  color: #f2a94b;
+  font-size: 25px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.win-primary-button {
+  width: 100%;
+  min-height: 48px;
+  border: 2px solid #26334d;
+  border-radius: 14px;
+  background: #f6bc32;
+  padding: 8px 16px;
+  color: #26334d;
+  font-size: 16px;
+  font-weight: 950;
+  box-shadow: 3px 3px 0 #26334d;
+  cursor: pointer;
+}
+
+.win-primary-button:focus-visible {
+  outline: 4px solid #2aa8ef;
+  outline-offset: 3px;
+}
+
+.win-primary-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #26334d;
+}
+
 .controls-row {
   display: flex;
   align-items: center;
@@ -177,24 +245,6 @@ button { font: inherit; }
   cursor: pointer;
 }
 
-.next-button {
-  min-height: 42px;
-  border: 2px solid #26334d;
-  border-radius: 14px;
-  background: #f6bc32;
-  padding: 0 14px;
-  color: #26334d;
-  font-size: 13px;
-  font-weight: 900;
-  box-shadow: 3px 3px 0 #26334d;
-  cursor: pointer;
-}
-
-.next-button:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 #26334d;
-}
-
 .restart-button:hover { background: #33415f; }
 
 .restart-button:active {
@@ -224,9 +274,10 @@ button { font: inherit; }
   .controls-row { flex-direction: column; }
   .action-buttons { width: 100%; }
   .restart-button { padding-inline: 14px; }
-  .next-button { flex: 1; }
+  .win-overlay { padding: 18px; }
+  .win-card { padding-inline: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .restart-button { transition: none; }
+  .restart-button, .win-primary-button { transition: none; }
 }

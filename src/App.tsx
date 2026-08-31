@@ -448,23 +448,6 @@ export default function Home() {
         ctx.fillText("右へドラッグ → 離して発射", 180, 182);
       }
 
-      if (statusRef.current === "won") {
-        ctx.fillStyle = "rgba(22, 31, 52, .42)";
-        ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-        roundedRect(ctx, 42, 221, 276, 160, 28);
-        ctx.fillStyle = "#fffaf0";
-        ctx.fill();
-        ctx.fillStyle = "#28344f";
-        ctx.textAlign = "center";
-        ctx.font = "900 30px system-ui, sans-serif";
-        ctx.fillText("おひるね成功！", 180, 270);
-        ctx.font = "700 17px system-ui, sans-serif";
-        ctx.fillStyle = "#647086";
-        ctx.fillText(world.level === 1 ? "つぎは障害物をこえよう" : "全レベル クリア！", 180, 310);
-        ctx.fillStyle = "#f2a94b";
-        ctx.font = "900 25px system-ui, sans-serif";
-        ctx.fillText("Z z z ...", 180, 345);
-      }
     };
 
     const frame = (now: number) => {
@@ -569,6 +552,31 @@ export default function Home() {
           <div className="status-live" aria-live="polite">
             {status === "won" ? "クリア。おひるね成功！" : status === "failed" ? "失敗。もう一度挑戦できます。" : ""}
           </div>
+          {status === "won" ? (
+            <div className="win-overlay">
+              <div
+                className="win-card"
+                role="dialog"
+                aria-labelledby="win-title"
+                aria-describedby="win-message"
+              >
+                <h2 id="win-title">おひるね成功！</h2>
+                <p id="win-message">
+                  {level === 1 ? "つぎは障害物をこえよう" : "全レベル クリア！"}
+                </p>
+                <span className="win-sleep" aria-hidden="true">Z z z ...</span>
+                {nextLevel(level) !== null ? (
+                  <button className="win-primary-button" type="button" onClick={startNextLevel} autoFocus>
+                    つぎのレベル
+                  </button>
+                ) : (
+                  <button className="win-primary-button" type="button" onClick={resetGame} autoFocus>
+                    もう一度遊ぶ
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <div className="controls-row">
@@ -580,11 +588,6 @@ export default function Home() {
             <button className="restart-button" type="button" onClick={resetGame}>
               {status === "won" ? "もう一度" : "リスタート"}
             </button>
-            {status === "won" && nextLevel(level) !== null ? (
-              <button className="next-button" type="button" onClick={startNextLevel}>
-                つぎのレベル
-              </button>
-            ) : null}
           </div>
         </div>
 
