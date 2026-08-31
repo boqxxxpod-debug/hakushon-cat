@@ -96,6 +96,7 @@ export default function Home() {
     physicsRef.current = freshPhysics(levelRef.current);
     aimRef.current.active = false;
     sneezeRef.current = null;
+    lastAimRef.current = { x: 1, y: 0 };
     cooldownUntilRef.current = 0;
     statusRef.current = "playing";
     shotsRef.current = 0;
@@ -335,7 +336,7 @@ export default function Home() {
       ctx.fillStyle = "#b7c2d8";
       ctx.font = "700 12px system-ui, sans-serif";
       ctx.textAlign = "right";
-      ctx.fillText(definition.hint, 316, 45);
+      ctx.fillText(definition.hint, 226, 45, 112);
 
       ctx.fillStyle = "#d5aa76";
       ctx.fillRect(LEFT_WALL, FLOOR_Y, RIGHT_WALL - LEFT_WALL, 50);
@@ -549,6 +550,15 @@ export default function Home() {
             onPointerUp={releaseAim}
             onPointerCancel={releaseAim}
           />
+          <button
+            className="stage-restart-button"
+            type="button"
+            onClick={resetGame}
+            aria-label={`Level ${level}を最初からやり直す`}
+          >
+            <span aria-hidden="true">↻</span>
+            やり直す
+          </button>
           <div className="status-live" aria-live="polite">
             {status === "won" ? "クリア。おひるね成功！" : status === "failed" ? "失敗。もう一度挑戦できます。" : ""}
           </div>
