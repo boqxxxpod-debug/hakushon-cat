@@ -115,6 +115,44 @@ button { font: inherit; }
 
 .game-canvas:active { cursor: grabbing; }
 
+.stage-restart-button {
+  position: absolute;
+  z-index: 1;
+  top: clamp(15px, 5vw, 20px);
+  right: clamp(14px, 4vw, 20px);
+  min-width: 92px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 2px solid #fffaf0;
+  border-radius: 999px;
+  background: #26334d;
+  padding: 6px 12px;
+  color: #fffaf0;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 2px 2px 0 #f6bc32;
+  cursor: pointer;
+}
+
+.stage-restart-button span {
+  font-size: 20px;
+  line-height: .8;
+}
+
+.stage-restart-button:focus-visible {
+  outline: 4px solid #2aa8ef;
+  outline-offset: 3px;
+}
+
+.stage-restart-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
 .status-live {
   position: absolute;
   width: 1px;
@@ -279,5 +317,5 @@ button { font: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .restart-button, .win-primary-button { transition: none; }
+  .restart-button, .stage-restart-button, .win-primary-button { transition: none; }
 }
