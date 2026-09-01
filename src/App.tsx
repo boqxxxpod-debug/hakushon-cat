@@ -10,18 +10,14 @@ import {
   RIGHT_WALL,
   WORLD_H,
   WORLD_W,
-  applyGroundFriction,
-  approach,
   clamp,
   freshPhysics,
-  isRestingOnCushion,
   nextLevel,
   powerForDistance,
   sneezeVelocity,
+  stepPhysics,
   type AimState,
-  type Body,
   type LevelId,
-  type Obstacle,
   type PhysicsState,
   type PlayStatus,
   type SneezeState,
@@ -143,115 +139,16 @@ export default function Home() {
     let previous = performance.now();
     let accumulator = 0;
 
-    const collideWithFloorAndWalls = (
-      body: Body,
-      radius: number,
-      friction: number,
-      dt: number,
-    ) => {
-      const onFloor = body.y >= FLOOR_Y - radius - 0.5;
-      if (body.y > FLOOR_Y - radius) {
-        body.y = FLOOR_Y - radius;
-        if (body.vy > 0) body.vy *= -0.15;
-        if (Math.abs(body.vy) < 28) body.vy = 0;
-      }
-      if (body.x < LEFT_WALL + radius) {
-        body.x = LEFT_WALL + radius;
-        if (body.vx < 0) body.vx *= -0.18;
-      }
-      if (body.x > RIGHT_WALL - radius) {
-        body.x = RIGHT_WALL - radius;
-        if (body.vx > 0) body.vx *= -0.18;
-      }
-      if (onFloor) body.vx = approach(body.vx, 0, friction * dt);
-    };
-
-    const resolveCatBox = (world: PhysicsState) => {
-      const cat = world.cat;
-      const box = world.box;
-      const nearestX = clamp(cat.x, box.x - BOX_HALF, box.x + BOX_HALF);
-      const nearestY = clamp(cat.y, box.y - BOX_HALF, box.y + BOX_HALF);
-      let dx = cat.x - nearestX;
-      let dy = cat.y - nearestY;
-      let distance = Math.hypot(dx, dy);
-      if (distance >= CAT_R) return;
-      if (distance < 0.001) {
-        dx = cat.x < box.x ? -1 : 1;
-        dy = 0;
-        distance = 1;
-      }
-      const nx = dx / distance;
-      const ny = dy / distance;
-      const overlap = CAT_R - distance;
-      cat.x += nx * overlap * 0.62;
-      cat.y += ny * overlap * 0.62;
-      box.x -= nx * overlap * 0.38;
-      box.y -= ny * overlap * 0.38;
-      const relative = (cat.vx - box.vx) * nx + (cat.vy - box.vy) * ny;
-      if (relative < 0) {
-        const impulse = -relative * 0.58;
-        cat.vx += nx * impulse;
-        cat.vy += ny * impulse;
-        box.vx -= nx * impulse * 0.85;
-        box.vy -= ny * impulse * 0.85;
-      }
-    };
-
-    const resolveBodyObstacle = (body: Body, radius: number, obstacle: Obstacle) => {
-      const nearestX = clamp(body.x, obstacle.x, obstacle.x + obstacle.width);
-      const nearestY = clamp(body.y, obstacle.y, obstacle.y + obstacle.height);
-      let dx = body.x - nearestX;
-      let dy = body.y - nearestY;
-      const distance = Math.hypot(dx, dy);
-      if (distance >= radius) return;
-      if (distance < 0.001) {
-        const left = Math.abs(body.x - obstacle.x);
-        const right = Math.abs(obstacle.x + obstacle.width - body.x);
-        dx = left < right ? -1 : 1;
-        dy = 0;
-      } else {
-        dx /= distance;
-        dy /= distance;
-      }
-      const overlap = radius - distance;
-      body.x += dx * overlap;
-      body.y += dy * overlap;
-      const intoSurface = body.vx * dx + body.vy * dy;
-      if (intoSurface < 0) {
-        body.vx -= intoSurface * dx * 1.18;
-        body.vy -= intoSurface * dy * 1.18;
-      }
-    };
-
     const step = (dt: number) => {
       if (statusRef.current !== "playing") return;
       const world = physicsRef.current;
-      for (const body of [world.cat, world.box]) {
-        body.vy += 1180 * dt;
-        body.vx *= Math.pow(0.99, dt * 60);
-        body.vy *= Math.pow(0.997, dt * 60);
-        body.x += body.vx * dt;
-        body.y += body.vy * dt;
-      }
-
-      collideWithFloorAndWalls(world.cat, CAT_R, 0, dt);
-      if (world.cat.y >= FLOOR_Y - CAT_R - 0.5) {
-        world.cat.vx = applyGroundFriction(world.cat.vx, dt);
-      }
-      collideWithFloorAndWalls(world.box, BOX_HALF, 520, dt);
-      resolveCatBox(world);
-      for (const obstacle of world.obstacles) {
-        resolveBodyObstacle(world.cat, CAT_R, obstacle);
-        resolveBodyObstacle(world.box, BOX_HALF, obstacle);
-      }
+      stepPhysics(world, dt);
 
       if (sneezeRef.current) {
         sneezeRef.current.age += dt;
         if (sneezeRef.current.age > 0.42) sneezeRef.current = null;
       }
 
-      const restingOnCushion = isRestingOnCushion(world.cat, world.level);
-      world.goalHold = restingOnCushion ? world.goalHold + dt : 0;
       if (world.goalHold >= 0.6) {
         statusRef.current = "won";
         setStatus("won");
@@ -375,24 +272,26 @@ export default function Home() {
         ctx.fill();
       }
 
-      ctx.save();
-      ctx.translate(world.box.x, world.box.y);
-      ctx.rotate(clamp(world.box.vx / 900, -0.12, 0.12));
-      ctx.fillStyle = "#cb834d";
-      ctx.strokeStyle = "#764326";
-      ctx.lineWidth = 4;
-      roundedRect(ctx, -BOX_HALF, -BOX_HALF, BOX_HALF * 2, BOX_HALF * 2, 5);
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = "rgba(118, 67, 38, .55)";
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(-13, -13);
-      ctx.lineTo(13, 13);
-      ctx.moveTo(13, -13);
-      ctx.lineTo(-13, 13);
-      ctx.stroke();
-      ctx.restore();
+      if (world.box) {
+        ctx.save();
+        ctx.translate(world.box.x, world.box.y);
+        ctx.rotate(clamp(world.box.vx / 900, -0.12, 0.12));
+        ctx.fillStyle = "#cb834d";
+        ctx.strokeStyle = "#764326";
+        ctx.lineWidth = 4;
+        roundedRect(ctx, -BOX_HALF, -BOX_HALF, BOX_HALF * 2, BOX_HALF * 2, 5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(118, 67, 38, .55)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-13, -13);
+        ctx.lineTo(13, 13);
+        ctx.moveTo(13, -13);
+        ctx.lineTo(-13, 13);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       if (sneezeRef.current) {
         const sneeze = sneezeRef.current;
@@ -446,7 +345,11 @@ export default function Home() {
         ctx.fillText("ネコを押したまま", 180, 157);
         ctx.font = "700 15px system-ui, sans-serif";
         ctx.fillStyle = "#59657c";
-        ctx.fillText("右へドラッグ → 離して発射", 180, 182);
+        ctx.fillText(
+          world.level === 1 ? "右へドラッグ → 離して発射" : "左下へ長くドラッグ → 離す",
+          180,
+          182,
+        );
       }
 
     };
@@ -511,13 +414,15 @@ export default function Home() {
     cat.vy += velocity.vy;
 
     const box = physicsRef.current.box;
-    const toBoxX = box.x - cat.x;
-    const toBoxY = box.y - cat.y;
-    const boxDistance = Math.hypot(toBoxX, toBoxY);
-    const coneDot = boxDistance > 0 ? (toBoxX * dirX + toBoxY * dirY) / boxDistance : -1;
-    if (boxDistance < 155 && coneDot > 0.82) {
-      box.vx += dirX * (230 + 220 * power);
-      box.vy += dirY * (130 + 130 * power) - 50 * power;
+    if (box) {
+      const toBoxX = box.x - cat.x;
+      const toBoxY = box.y - cat.y;
+      const boxDistance = Math.hypot(toBoxX, toBoxY);
+      const coneDot = boxDistance > 0 ? (toBoxX * dirX + toBoxY * dirY) / boxDistance : -1;
+      if (boxDistance < 155 && coneDot > 0.82) {
+        box.vx += dirX * (230 + 220 * power);
+        box.vy += dirY * (130 + 130 * power) - 50 * power;
+      }
     }
 
     sneezeRef.current = { age: 0, dirX, dirY, power };
@@ -544,7 +449,11 @@ export default function Home() {
           <canvas
             ref={canvasRef}
             className="game-canvas"
-            aria-label="ネコを押して右へドラッグし、離すとくしゃみます。ネコは反動で左へ動きます。"
+            aria-label={
+              level === 1
+                ? "ネコを押して右へドラッグし、離すとくしゃみます。ネコは反動で左へ動きます。"
+                : "ネコを押して左下へ長くドラッグし、離すとくしゃみます。ネコは反動で右上へ動きます。"
+            }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={releaseAim}
