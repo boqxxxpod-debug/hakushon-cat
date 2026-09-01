@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  BOX_HALF,
   CAT_R,
   FLOOR_Y,
   LEVELS,
@@ -11,6 +12,7 @@ import {
   nextLevel,
   powerForDistance,
   sneezeVelocity,
+  stepPhysics,
 } from "../src/physics.ts";
 
 test("ground friction stops maximum horizontal recoil within about 0.35 seconds", () => {
@@ -31,21 +33,49 @@ test("freshPhysics creates the intended level-one layout", () => {
   const world = freshPhysics();
 
   assert.deepEqual(world.cat, { x: 225, y: FLOOR_Y - CAT_R, vx: 0, vy: 0 });
-  assert.equal(world.box.x, 292);
+  assert.deepEqual(world.box, { x: 292, y: FLOOR_Y - BOX_HALF, vx: 0, vy: 0 });
+  assert.deepEqual(LEVELS[1].goal, { left: 43, right: 143, top: 486, bottom: 522 });
+  assert.equal(LEVELS[1].hint, "右へ くしゃみ！");
   assert.equal(world.level, 1);
   assert.deepEqual(world.obstacles, []);
   assert.equal(world.goalHold, 0);
 });
 
-test("level two has a distinct deterministic layout with a box and fixed obstacle", () => {
+test("level two is a deterministic low-wall practice layout without a box", () => {
   const first = freshPhysics(2);
   const second = freshPhysics(2);
 
   assert.deepEqual(first, second);
   assert.equal(first.level, 2);
   assert.notDeepEqual(first.cat, freshPhysics(1).cat);
+  assert.equal(first.box, null);
   assert.equal(first.obstacles.length, 1);
-  assert.ok(first.box.x < first.obstacles[0].x);
+  assert.equal(first.obstacles[0].height, 30);
+  assert.ok(LEVELS[2].goal.right - LEVELS[2].goal.left > LEVELS[1].goal.right - LEVELS[1].goal.left);
+});
+
+test("level two clears in one recoil across the accepted angle and power tolerance", () => {
+  const angles = [37, 41, 45, 49, 53];
+  const powers = [0.9, 0.95, 1];
+
+  for (const angle of angles) {
+    for (const power of powers) {
+      const world = freshPhysics(2);
+      const radians = (angle * Math.PI) / 180;
+      const velocity = sneezeVelocity(-Math.cos(radians), Math.sin(radians), power);
+      world.cat.vx = velocity.vx;
+      world.cat.vy = velocity.vy;
+
+      for (let frame = 0; frame < 240 && world.goalHold < 0.6; frame += 1) {
+        stepPhysics(world, 1 / 60);
+      }
+
+      assert.ok(
+        world.goalHold >= 0.6,
+        `expected one-shot clear at ${angle} degrees and ${Math.round(power * 100)}% power`,
+      );
+    }
+  }
 });
 
 test("level progression stops after level two and restart preserves the current level", () => {
