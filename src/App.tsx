@@ -335,21 +335,40 @@ export default function Home() {
 
       drawAim(world);
 
-      if (!aimRef.current.active && statusRef.current === "playing" && shotsRef.current === 0) {
-        roundedRect(ctx, 49, 132, 262, 70, 18);
+      const showLevelThreeGuide = world.level === 3 && shotsRef.current < 2;
+      if (
+        !aimRef.current.active &&
+        statusRef.current === "playing" &&
+        (shotsRef.current === 0 || showLevelThreeGuide)
+      ) {
+        const isLevelThree = world.level === 3;
+        const reachedLeftWall = world.cat.x <= LEFT_WALL + CAT_R + 8;
+        roundedRect(ctx, 39, 132, 282, isLevelThree ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
         ctx.textAlign = "center";
-        ctx.font = "800 17px system-ui, sans-serif";
-        ctx.fillText("ネコを押したまま", 180, 157);
-        ctx.font = "700 15px system-ui, sans-serif";
-        ctx.fillStyle = "#59657c";
-        ctx.fillText(
-          world.level === 1 ? "右へドラッグ → 離して発射" : "左下へ長くドラッグ → 離す",
-          180,
-          182,
-        );
+        if (isLevelThree) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = reachedLeftWall ? "#28794f" : "#26334d";
+          ctx.fillText(
+            reachedLeftWall ? "① 左壁まで移動できた！" : "① 右へ長くドラッグ → 左壁へ",
+            180,
+            158,
+          );
+          ctx.fillStyle = reachedLeftWall ? "#26334d" : "#59657c";
+          ctx.fillText("② 左下へ長くドラッグ → 壁越え", 180, 187);
+        } else {
+          ctx.font = "800 17px system-ui, sans-serif";
+          ctx.fillText("ネコを押したまま", 180, 157);
+          ctx.font = "700 15px system-ui, sans-serif";
+          ctx.fillStyle = "#59657c";
+          ctx.fillText(
+            world.level === 1 ? "右へドラッグ → 離して発射" : "左下へ長くドラッグ → 離す",
+            180,
+            182,
+          );
+        }
       }
 
     };
@@ -452,7 +471,9 @@ export default function Home() {
             aria-label={
               level === 1
                 ? "ネコを押して右へドラッグし、離すとくしゃみます。ネコは反動で左へ動きます。"
-                : "ネコを押して左下へ長くドラッグし、離すとくしゃみます。ネコは反動で右上へ動きます。"
+                : level === 2
+                  ? "ネコを押して左下へ長くドラッグし、離すとくしゃみます。ネコは反動で右上へ動きます。"
+                  : "最初はネコを右へ長くドラッグして左壁まで移動します。次に左下へ長くドラッグし、反動で中央の壁を越えます。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -481,7 +502,11 @@ export default function Home() {
               >
                 <h2 id="win-title">おひるね成功！</h2>
                 <p id="win-message">
-                  {level === 1 ? "つぎは障害物をこえよう" : "全レベル クリア！"}
+                  {level === 1
+                    ? "つぎは障害物をこえよう"
+                    : level === 2
+                      ? "つぎは壁で向きを変えよう"
+                      : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (

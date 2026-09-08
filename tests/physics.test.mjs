@@ -4,6 +4,7 @@ import {
   BOX_HALF,
   CAT_R,
   FLOOR_Y,
+  LEFT_WALL,
   LEVELS,
   MAX_AIM_DISTANCE,
   applyGroundFriction,
@@ -78,11 +79,67 @@ test("level two clears in one recoil across the accepted angle and power toleran
   }
 });
 
-test("level progression stops after level two and restart preserves the current level", () => {
+test("level three uses the left wall as a setup for a tolerant second recoil", () => {
+  const firstShot = sneezeVelocity(1, 0, 1);
+  const secondShotAngles = [37, 41, 45, 49, 53];
+  const secondShotPowers = [0.9, 0.95, 1];
+
+  for (const angle of secondShotAngles) {
+    for (const power of secondShotPowers) {
+      const world = freshPhysics(3);
+      world.cat.vx = firstShot.vx;
+      world.cat.vy = firstShot.vy;
+
+      for (let frame = 0; frame < 90; frame += 1) {
+        stepPhysics(world, 1 / 60);
+      }
+
+      assert.ok(world.cat.x <= LEFT_WALL + CAT_R + 3, "the first shot should stop at the left wall");
+      assert.ok(Math.hypot(world.cat.vx, world.cat.vy) < 1, "the cat should be still before shot two");
+
+      const radians = (angle * Math.PI) / 180;
+      const velocity = sneezeVelocity(-Math.cos(radians), Math.sin(radians), power);
+      world.cat.vx = velocity.vx;
+      world.cat.vy = velocity.vy;
+
+      for (let frame = 0; frame < 240 && world.goalHold < 0.6; frame += 1) {
+        stepPhysics(world, 1 / 60);
+      }
+
+      assert.ok(
+        world.goalHold >= 0.6,
+        `expected two-shot clear at ${angle} degrees and ${Math.round(power * 100)}% power`,
+      );
+    }
+  }
+});
+
+test("level three cannot skip the left-wall setup with its baseline second shot", () => {
+  const world = freshPhysics(3);
+  const obstacle = LEVELS[3].obstacles[0];
+  const radians = (45 * Math.PI) / 180;
+  const velocity = sneezeVelocity(-Math.cos(radians), Math.sin(radians), 0.95);
+  world.cat.vx = velocity.vx;
+  world.cat.vy = velocity.vy;
+  let furthestX = world.cat.x;
+
+  for (let frame = 0; frame < 240; frame += 1) {
+    stepPhysics(world, 1 / 60);
+    furthestX = Math.max(furthestX, world.cat.x);
+  }
+
+  assert.ok(furthestX < obstacle.x, "the cat should be stopped by the wall without the setup shot");
+  assert.ok(world.goalHold < 0.6);
+});
+
+test("level progression stops after level three and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
-  assert.equal(nextLevel(2), null);
+  assert.equal(nextLevel(2), 3);
+  assert.equal(nextLevel(3), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
+  assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
+  assert.deepEqual(freshPhysics(3), freshPhysics(3));
 });
 
 test("power is clamped between minimum and maximum", () => {
@@ -107,5 +164,8 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 43, vy: 0 }), false);
   assert.equal(isRestingOnCushion({ x: 285, y: 520, vx: 2, vy: 1 }, 2), true);
   assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 2, vy: 1 }, 2), false);
+  assert.equal(isRestingOnCushion({ x: 245, y: 520, vx: 2, vy: 1 }, 3), true);
+  assert.equal(isRestingOnCushion({ x: 130, y: 520, vx: 2, vy: 1 }, 3), false);
   assert.ok(LEVELS[2].goal.left > LEVELS[1].goal.right);
+  assert.ok(LEVELS[3].goal.left > LEVELS[3].obstacles[0].x + LEVELS[3].obstacles[0].width);
 });
