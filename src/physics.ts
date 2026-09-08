@@ -8,7 +8,7 @@ export const BOX_HALF = 21;
 export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 
-export type LevelId = 1 | 2;
+export type LevelId = 1 | 2 | 3;
 
 export type Obstacle = {
   x: number;
@@ -74,10 +74,20 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     obstacles: [{ x: 185, y: FLOOR_Y - 30, width: 24, height: 30 }],
     hint: "左下へ長くドラッグ！",
   },
+  3: {
+    id: 3,
+    cat: { x: 120, y: FLOOR_Y - CAT_R },
+    box: null,
+    goal: { left: 200, right: 333, top: 486, bottom: 522 },
+    obstacles: [{ x: 155, y: FLOOR_Y - 30, width: 24, height: 30 }],
+    hint: "右へ → 左下へ！",
+  },
 };
 
 export function nextLevel(level: LevelId): LevelId | null {
-  return level === 1 ? 2 : null;
+  if (level === 1) return 2;
+  if (level === 2) return 3;
+  return null;
 }
 
 export function freshPhysics(level: LevelId = 1): PhysicsState {
