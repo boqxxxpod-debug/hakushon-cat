@@ -23,6 +23,12 @@ export type IceZone = {
   width: number;
 };
 
+export type SpringPad = {
+  x: number;
+  width: number;
+  launchVelocity: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -30,6 +36,7 @@ export type LevelDefinition = {
   goal: { left: number; right: number; top: number; bottom: number };
   obstacles: Obstacle[];
   iceZones: IceZone[];
+  springs: SpringPad[];
   hint: string;
 };
 
@@ -48,6 +55,8 @@ export type PhysicsState = {
   box: Body | null;
   obstacles: Obstacle[];
   iceZones: IceZone[];
+  springs: SpringPad[];
+  springArmed: boolean[];
   goalHold: number;
 };
 
@@ -73,6 +82,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     goal: { left: 48, right: 148, top: 486, bottom: 522 },
     obstacles: [],
     iceZones: [],
+    springs: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -82,6 +92,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     goal: { left: 128, right: 166, top: 486, bottom: 522 },
     obstacles: [],
     iceZones: [],
+    springs: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
@@ -91,16 +102,18 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     goal: { left: 48, right: 112, top: 486, bottom: 522 },
     obstacles: [],
     iceZones: [{ x: 112, width: 213 }],
+    springs: [],
     hint: "氷の上はツルツル！",
   },
   4: {
     id: 4,
-    cat: { x: 250, y: FLOOR_Y - CAT_R },
-    box: { x: 175, y: FLOOR_Y - BOX_HALF },
-    goal: { left: 128, right: 166, top: 486, bottom: 522 },
-    obstacles: [],
+    cat: { x: 70, y: FLOOR_Y - CAT_R },
+    box: null,
+    goal: { left: 238, right: 326, top: 350, bottom: 382 },
+    obstacles: [{ x: 220, y: 405, width: 112, height: 140 }],
     iceZones: [],
-    hint: "箱を左へ → 右下へ！",
+    springs: [{ x: 135, width: 65, launchVelocity: 760 }],
+    hint: "バネに乗って高い足場へ！",
   },
 };
 
@@ -119,6 +132,8 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     box: definition.box ? { ...definition.box, vx: 0, vy: 0 } : null,
     obstacles: definition.obstacles.map((obstacle) => ({ ...obstacle })),
     iceZones: definition.iceZones.map((zone) => ({ ...zone })),
+    springs: definition.springs.map((spring) => ({ ...spring })),
+    springArmed: definition.springs.map(() => true),
     goalHold: 0,
   };
 }
@@ -240,7 +255,7 @@ function resolveBodyObstacle(body: Body, radius: number, obstacle: Obstacle) {
   let dx = body.x - nearestX;
   let dy = body.y - nearestY;
   const distance = Math.hypot(dx, dy);
-  if (distance >= radius) return;
+  if (distance >= radius) return false;
   if (distance < 0.001) {
     const left = Math.abs(body.x - obstacle.x);
     const right = Math.abs(obstacle.x + obstacle.width - body.x);
@@ -258,6 +273,25 @@ function resolveBodyObstacle(body: Body, radius: number, obstacle: Obstacle) {
     body.vx -= intoSurface * dx * 1.18;
     body.vy -= intoSurface * dy * 1.18;
   }
+  return dy < -0.7;
+}
+
+function stepSprings(world: PhysicsState) {
+  world.springs.forEach((spring, index) => {
+    const touching = (
+      world.cat.x >= spring.x - CAT_R * 0.35 &&
+      world.cat.x <= spring.x + spring.width + CAT_R * 0.35 &&
+      world.cat.y >= FLOOR_Y - CAT_R - 1
+    );
+
+    if (touching && world.springArmed[index]) {
+      world.cat.y = FLOOR_Y - CAT_R - 2;
+      world.cat.vy = -spring.launchVelocity;
+      world.springArmed[index] = false;
+    } else if (!touching) {
+      world.springArmed[index] = true;
+    }
+  });
 }
 
 export function stepPhysics(world: PhysicsState, dt: number) {
@@ -285,10 +319,14 @@ export function stepPhysics(world: PhysicsState, dt: number) {
     resolveCatBox(world);
   }
 
+  let catOnPlatform = false;
   for (const obstacle of world.obstacles) {
-    resolveBodyObstacle(world.cat, CAT_R, obstacle);
+    catOnPlatform = resolveBodyObstacle(world.cat, CAT_R, obstacle) || catOnPlatform;
     if (world.box) resolveBodyObstacle(world.box, BOX_HALF, obstacle);
   }
+  if (catOnPlatform) world.cat.vx = applyGroundFriction(world.cat.vx, dt);
+
+  stepSprings(world);
 
   const restingOnCushion = isRestingOnCushion(world.cat, world.level);
   world.goalHold = restingOnCushion ? world.goalHold + dt : 0;

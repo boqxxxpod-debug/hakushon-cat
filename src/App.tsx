@@ -259,23 +259,43 @@ export default function Home() {
         }
       }
 
+      world.springs.forEach((spring, index) => {
+        const compressed = world.springArmed[index] === false;
+        const springY = compressed ? FLOOR_Y - 8 : FLOOR_Y - 17;
+        ctx.fillStyle = "#f15b67";
+        ctx.strokeStyle = "#8f2632";
+        ctx.lineWidth = 3;
+        roundedRect(ctx, spring.x, springY, spring.width, compressed ? 12 : 21, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = "#fff4b8";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let x = spring.x + 8; x <= spring.x + spring.width - 8; x += 10) {
+          ctx.moveTo(x, springY + 5);
+          ctx.lineTo(x + 5, springY + (compressed ? 8 : 16));
+        }
+        ctx.stroke();
+      });
+
       ctx.save();
       ctx.shadowColor = "rgba(52, 110, 80, .2)";
       ctx.shadowBlur = 10;
       const goalX = definition.goal.left - 5;
       const goalWidth = definition.goal.right - definition.goal.left + 10;
-      roundedRect(ctx, goalX, 511, goalWidth, 31, 15);
+      const goalY = definition.goal.bottom - 11;
+      roundedRect(ctx, goalX, goalY, goalWidth, 31, 15);
       ctx.fillStyle = "#8cd7ab";
       ctx.fill();
       ctx.restore();
       ctx.strokeStyle = "#3f9a6a";
       ctx.lineWidth = 3;
-      roundedRect(ctx, goalX, 511, goalWidth, 31, 15);
+      roundedRect(ctx, goalX, goalY, goalWidth, 31, 15);
       ctx.stroke();
       ctx.fillStyle = "#28794f";
       ctx.font = "800 11px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("おひるね", goalX + goalWidth / 2, 527);
+      ctx.fillText("おひるね", goalX + goalWidth / 2, goalY + 16);
 
       for (const obstacle of world.obstacles) {
         ctx.fillStyle = "#66748d";
@@ -355,7 +375,7 @@ export default function Home() {
       const showLevelOneGuide = world.level === 1 && shotsRef.current < 2;
       const showLevelTwoGuide = world.level === 2 && shotsRef.current < 2;
       const showLevelThreeGuide = world.level === 3 && shotsRef.current < 1;
-      const showLevelFourGuide = world.level === 4 && shotsRef.current < 2;
+      const showLevelFourGuide = world.level === 4 && shotsRef.current < 1;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
@@ -381,7 +401,7 @@ export default function Home() {
           );
           ctx.fillStyle = shotsRef.current === 0 ? "#59657c" : "#26334d";
           ctx.fillText("② もう一度右へ → クッション", 180, 187);
-        } else if (isLevelTwo || isLevelFour) {
+        } else if (isLevelTwo) {
           ctx.font = "800 15px system-ui, sans-serif";
           ctx.fillStyle = movedBoxAside ? "#28794f" : "#26334d";
           ctx.fillText(
@@ -397,6 +417,12 @@ export default function Home() {
           ctx.fillText("氷の上は止まりにくい！", 180, 158);
           ctx.fillStyle = "#26334d";
           ctx.fillText("右へ長くドラッグ → 左へ滑る", 180, 187);
+        } else if (isLevelFour) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = "#c33c4a";
+          ctx.fillText("バネに乗ると自動でジャンプ！", 180, 158);
+          ctx.fillStyle = "#26334d";
+          ctx.fillText("左へ長くドラッグ → 右へ反動", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -500,7 +526,7 @@ export default function Home() {
                   ? "最初はネコを左へ長くドラッグし、風で箱を左へ押しながら反動で右へ移動します。次に右下へ長くドラッグし、箱が空けたクッションへ戻ります。"
                   : level === 3
                     ? "氷の上ではネコが長く滑ります。ネコを右へ長くドラッグし、反動で左へ滑って氷の先のクッションで止まりましょう。"
-                    : "最初はネコを左へ長くドラッグし、風で箱を左へ押しながら反動で右へ移動します。次に右下へ長くドラッグし、箱が空けたクッションへ戻ります。"
+                    : "ネコを左へ長くドラッグし、反動で右のバネへ乗せます。バネで跳ね上がり、高い足場のクッションへ着地しましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -534,7 +560,7 @@ export default function Home() {
                     : level === 2
                       ? "つぎは氷で滑ろう"
                       : level === 3
-                        ? "つぎは箱をどけよう"
+                        ? "つぎはバネでジャンプ"
                         : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
