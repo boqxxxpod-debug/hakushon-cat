@@ -10,7 +10,7 @@ export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export type Obstacle = {
   x: number;
@@ -48,6 +48,11 @@ export type Seesaw = {
   angularSpeed: number;
 };
 
+export type BreakableWall = Obstacle & {
+  durability: number;
+  minImpact: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -60,6 +65,7 @@ export type LevelDefinition = {
   switches: PressureSwitch[];
   gates: Gate[];
   seesaws: Seesaw[];
+  breakableWalls: BreakableWall[];
   hint: string;
 };
 
@@ -88,6 +94,9 @@ export type PhysicsState = {
   gateOpen: boolean[];
   seesaws: Seesaw[];
   seesawAngles: number[];
+  breakableWalls: BreakableWall[];
+  wallHealth: number[];
+  wallBroken: boolean[];
   goalHold: number;
 };
 
@@ -118,6 +127,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     switches: [],
     gates: [],
     seesaws: [],
+    breakableWalls: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -132,6 +142,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     switches: [],
     gates: [],
     seesaws: [],
+    breakableWalls: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
@@ -146,6 +157,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     switches: [],
     gates: [],
     seesaws: [],
+    breakableWalls: [],
     hint: "氷の上はツルツル！",
   },
   4: {
@@ -160,6 +172,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     switches: [],
     gates: [],
     seesaws: [],
+    breakableWalls: [],
     hint: "バネに乗って高い足場へ！",
   },
   5: {
@@ -174,6 +187,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     switches: [],
     gates: [],
     seesaws: [],
+    breakableWalls: [],
     hint: "弱い風で風船をどかそう！",
   },
   6: {
@@ -188,6 +202,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     switches: [{ x: 26, width: 65 }],
     gates: [],
     seesaws: [],
+    breakableWalls: [],
     hint: "箱を置いてスイッチON！",
   },
   7: {
@@ -202,6 +217,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     switches: [{ x: 26, width: 65 }],
     gates: [{ x: 207, y: 145, width: 14, height: 400, switchIndex: 0 }],
     seesaws: [],
+    breakableWalls: [],
     hint: "スイッチでゲートOPEN！",
   },
   8: {
@@ -223,7 +239,30 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
       maxAngle: 0.25,
       angularSpeed: 1.8,
     }],
+    breakableWalls: [],
     hint: "箱でシーソーを傾けよう！",
+  },
+  9: {
+    id: 9,
+    cat: { x: 50, y: FLOOR_Y - CAT_R },
+    box: { x: 125, y: FLOOR_Y - BOX_HALF },
+    balloon: null,
+    goal: { left: 207, right: 252, top: 486, bottom: 522 },
+    obstacles: [],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [{
+      x: 165,
+      y: 145,
+      width: 16,
+      height: 400,
+      durability: 100,
+      minImpact: 330,
+    }],
+    hint: "箱を加速して壁を壊せ！",
   },
 };
 
@@ -235,6 +274,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 5) return 6;
   if (level === 6) return 7;
   if (level === 7) return 8;
+  if (level === 8) return 9;
   return null;
 }
 
@@ -256,6 +296,9 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     gateOpen: definition.gates.map(() => false),
     seesaws: definition.seesaws.map((seesaw) => ({ ...seesaw })),
     seesawAngles: definition.seesaws.map(() => 0),
+    breakableWalls: definition.breakableWalls.map((wall) => ({ ...wall })),
+    wallHealth: definition.breakableWalls.map((wall) => wall.durability),
+    wallBroken: definition.breakableWalls.map(() => false),
     goalHold: 0,
   };
 }
@@ -473,6 +516,25 @@ function resolveBodyObstacle(body: Body, radius: number, obstacle: Obstacle) {
   return dy < -0.7;
 }
 
+function obstacleImpactSpeed(body: Body, radius: number, obstacle: Obstacle) {
+  const nearestX = clamp(body.x, obstacle.x, obstacle.x + obstacle.width);
+  const nearestY = clamp(body.y, obstacle.y, obstacle.y + obstacle.height);
+  let dx = body.x - nearestX;
+  let dy = body.y - nearestY;
+  const distance = Math.hypot(dx, dy);
+  if (distance >= radius) return 0;
+  if (distance < 0.001) {
+    const left = Math.abs(body.x - obstacle.x);
+    const right = Math.abs(obstacle.x + obstacle.width - body.x);
+    dx = left < right ? -1 : 1;
+    dy = 0;
+  } else {
+    dx /= distance;
+    dy /= distance;
+  }
+  return Math.max(0, -(body.vx * dx + body.vy * dy));
+}
+
 function stepSprings(world: PhysicsState) {
   world.springs.forEach((spring, index) => {
     const touching = (
@@ -511,6 +573,26 @@ function stepGates(world: PhysicsState) {
     if (world.gateOpen[index]) return;
     resolveBodyObstacle(world.cat, CAT_R, gate);
     if (world.box) resolveBodyObstacle(world.box, BOX_HALF, gate);
+  });
+}
+
+function stepBreakableWalls(world: PhysicsState) {
+  world.breakableWalls.forEach((wall, index) => {
+    if (world.wallBroken[index]) return;
+
+    resolveBodyObstacle(world.cat, CAT_R, wall);
+    if (!world.box) return;
+
+    const impactSpeed = obstacleImpactSpeed(world.box, BOX_HALF, wall);
+    if (impactSpeed >= wall.minImpact) {
+      const damage = impactSpeed - wall.minImpact + 30;
+      world.wallHealth[index] = Math.max(0, world.wallHealth[index] - damage);
+      if (world.wallHealth[index] <= 0) {
+        world.wallBroken[index] = true;
+        return;
+      }
+    }
+    resolveBodyObstacle(world.box, BOX_HALF, wall);
   });
 }
 
@@ -644,11 +726,13 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   stepSprings(world);
   stepSwitches(world);
   stepGates(world);
+  stepBreakableWalls(world);
   stepSeesaws(world, dt);
 
   const goalUnlocked = (
     (world.level !== 5 || world.balloonCleared) &&
     (world.level !== 6 || world.switchOn.every(Boolean)) &&
+    (world.level !== 9 || world.wallBroken.every(Boolean)) &&
     isSeesawReady(world)
   );
   const restingOnCushion = goalUnlocked && isRestingOnCushion(world.cat, world.level);

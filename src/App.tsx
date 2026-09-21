@@ -216,7 +216,8 @@ export default function Home() {
       const goalLocked = (
         (world.level === 5 && !world.balloonCleared) ||
         (world.level === 6 && !world.switchOn.every(Boolean)) ||
-        (world.level === 8 && !isSeesawReady(world))
+        (world.level === 8 && !isSeesawReady(world)) ||
+        (world.level === 9 && !world.wallBroken.every(Boolean))
       );
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
@@ -379,6 +380,55 @@ export default function Home() {
         ctx.fillText(isOpen ? "OPEN" : "CLOSED", gate.x + gate.width / 2, 110);
       });
 
+      world.breakableWalls.forEach((wall, index) => {
+        const broken = world.wallBroken[index];
+        const healthRatio = world.wallHealth[index] / wall.durability;
+        if (broken) {
+          ctx.fillStyle = "#8b6f61";
+          roundedRect(ctx, wall.x - 7, FLOOR_Y - 13, wall.width + 14, 13, 3);
+          ctx.fill();
+          ctx.fillStyle = "#b29483";
+          ctx.fillRect(wall.x - 3, FLOOR_Y - 22, 11, 9);
+          ctx.fillRect(wall.x + 10, FLOOR_Y - 18, 10, 5);
+        } else {
+          ctx.fillStyle = healthRatio < 1 ? "#c98769" : "#9c8d87";
+          ctx.strokeStyle = healthRatio < 1 ? "#743d31" : "#514a49";
+          ctx.lineWidth = 3;
+          roundedRect(ctx, wall.x, wall.y, wall.width, wall.height, 3);
+          ctx.fill();
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(255,255,255,.38)";
+          ctx.lineWidth = 2;
+          for (let y = wall.y + 18; y < wall.y + wall.height; y += 32) {
+            ctx.beginPath();
+            ctx.moveTo(wall.x + 2, y);
+            ctx.lineTo(wall.x + wall.width - 2, y);
+            ctx.stroke();
+          }
+          if (healthRatio < 1) {
+            ctx.strokeStyle = "#5d3028";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(wall.x + wall.width / 2, wall.y + 120);
+            ctx.lineTo(wall.x + 3, wall.y + 158);
+            ctx.lineTo(wall.x + wall.width - 3, wall.y + 196);
+            ctx.lineTo(wall.x + 4, wall.y + 238);
+            ctx.stroke();
+          }
+        }
+        roundedRect(ctx, wall.x - 29, 96, wall.width + 58, 28, 12);
+        ctx.fillStyle = broken ? "#28794f" : healthRatio < 1 ? "#9d4d36" : "#514a49";
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "900 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          broken ? "BROKEN" : healthRatio < 1 ? "ひび" : "じょうぶ",
+          wall.x + wall.width / 2,
+          110,
+        );
+      });
+
       ctx.save();
       ctx.shadowColor = "rgba(52, 110, 80, .2)";
       ctx.shadowBlur = 10;
@@ -398,7 +448,13 @@ export default function Home() {
       ctx.textAlign = "center";
       ctx.fillText(
         goalLocked
-          ? (world.level === 6 ? "スイッチ待ち" : world.level === 8 ? "かたむき待ち" : "ふうせん待ち")
+          ? (world.level === 6
+              ? "スイッチ待ち"
+              : world.level === 8
+                ? "かたむき待ち"
+                : world.level === 9
+                  ? "カベ待ち"
+                  : "ふうせん待ち")
           : "おひるね",
         goalX + goalWidth / 2,
         goalY + 16,
@@ -516,10 +572,11 @@ export default function Home() {
       const showLevelSixGuide = world.level === 6 && shotsRef.current < 2;
       const showLevelSevenGuide = world.level === 7 && shotsRef.current < 2;
       const showLevelEightGuide = world.level === 8 && shotsRef.current < 2;
+      const showLevelNineGuide = world.level === 9 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -529,9 +586,10 @@ export default function Home() {
         const isLevelSix = world.level === 6;
         const isLevelSeven = world.level === 7;
         const isLevelEight = world.level === 8;
+        const isLevelNine = world.level === 9;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -609,6 +667,17 @@ export default function Home() {
           );
           ctx.fillStyle = seesawReady ? "#26334d" : "#59657c";
           ctx.fillText("② 右下へ短く → 高いクッション", 180, 187);
+        } else if (isLevelNine) {
+          const wallIsBroken = world.wallBroken.every(Boolean);
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = wallIsBroken ? "#28794f" : "#743d31";
+          ctx.fillText(
+            wallIsBroken ? "① 壁を壊せた！" : "① 右へ長く → 箱で壁を壊す",
+            180,
+            158,
+          );
+          ctx.fillStyle = wallIsBroken ? "#26334d" : "#59657c";
+          ctx.fillText("② 左下へ長く → 通り抜ける", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -720,7 +789,9 @@ export default function Home() {
                           ? "最初は左へ長くドラッグし、箱を赤いスイッチまで運んでONにします。次に右下へ長くドラッグし、使えるようになったクッションへ戻りましょう。"
                           : level === 7
                             ? "箱を赤いスイッチへ運ぶとゲートが開きます。箱を載せたまま、右下へ長くドラッグして開いた通路を抜け、クッションへ戻りましょう。"
-                            : "箱をシーソーの左側へ動かすと、反対側が高く上がります。右下へ短くドラッグし、高くなった右側のクッションへ着地しましょう。"
+                            : level === 8
+                              ? "箱をシーソーの左側へ動かすと、反対側が高く上がります。右下へ短くドラッグし、高くなった右側のクッションへ着地しましょう。"
+                              : "右へ長くドラッグし、箱を十分に加速して壁へぶつけます。壁が壊れたら左下へ長くドラッグし、反動で開いた通路を抜けましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -763,7 +834,9 @@ export default function Home() {
                               ? "つぎはゲートを開けよう"
                               : level === 7
                                 ? "つぎはシーソーで登ろう"
-                                : "全レベル クリア！"}
+                                : level === 8
+                                  ? "つぎは壁を壊そう"
+                                  : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (

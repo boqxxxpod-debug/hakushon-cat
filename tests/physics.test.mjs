@@ -188,7 +188,7 @@ test("level four uses its spring to reach the raised cushion", () => {
   assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
-test("level progression reaches level eight and restart preserves the current level", () => {
+test("level progression reaches level nine and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
@@ -196,7 +196,8 @@ test("level progression reaches level eight and restart preserves the current le
   assert.equal(nextLevel(5), 6);
   assert.equal(nextLevel(6), 7);
   assert.equal(nextLevel(7), 8);
-  assert.equal(nextLevel(8), null);
+  assert.equal(nextLevel(8), 9);
+  assert.equal(nextLevel(9), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
@@ -204,6 +205,7 @@ test("level progression reaches level eight and restart preserves the current le
   assert.deepEqual(freshPhysics(nextLevel(5)), freshPhysics(6));
   assert.deepEqual(freshPhysics(nextLevel(6)), freshPhysics(7));
   assert.deepEqual(freshPhysics(nextLevel(7)), freshPhysics(8));
+  assert.deepEqual(freshPhysics(nextLevel(8)), freshPhysics(9));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
@@ -211,6 +213,7 @@ test("level progression reaches level eight and restart preserves the current le
   assert.deepEqual(freshPhysics(6), freshPhysics(6));
   assert.deepEqual(freshPhysics(7), freshPhysics(7));
   assert.deepEqual(freshPhysics(8), freshPhysics(8));
+  assert.deepEqual(freshPhysics(9), freshPhysics(9));
 });
 
 test("level five balloon responds farther than a box to the same wind", () => {
@@ -434,6 +437,59 @@ test("level eight has a verified counterweight-and-landing solution", () => {
   assert.ok(world.cat.y < FLOOR_Y - CAT_R - 50);
 });
 
+test("level nine wall ignores weak wind and cat-only contact", () => {
+  const weakWind = freshPhysics(9);
+  applySneeze(weakWind, 1, 0, 0.6);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(weakWind, 1 / 60);
+  assert.equal(weakWind.wallHealth[0], weakWind.breakableWalls[0].durability);
+  assert.equal(weakWind.wallBroken[0], false);
+
+  const catOnly = freshPhysics(9);
+  catOnly.box = null;
+  catOnly.cat = { x: 130, y: 520, vx: 400, vy: 0 };
+  for (let frame = 0; frame < 30; frame += 1) stepPhysics(catOnly, 1 / 60);
+  assert.equal(catOnly.wallHealth[0], catOnly.breakableWalls[0].durability);
+  assert.equal(catOnly.wallBroken[0], false);
+  assert.ok(catOnly.cat.x <= catOnly.breakableWalls[0].x - CAT_R + 0.01);
+});
+
+test("level nine wall accumulates high-speed box damage and resets fully", () => {
+  const world = freshPhysics(9);
+  applySneeze(world, 1, 0, 0.8);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.ok(world.wallHealth[0] > 0);
+  assert.ok(world.wallHealth[0] < world.breakableWalls[0].durability);
+  assert.equal(world.wallBroken[0], false);
+
+  applySneeze(world, 1, 0, 0.8);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+  assert.equal(world.wallHealth[0], 0);
+  assert.equal(world.wallBroken[0], true);
+
+  const reset = freshPhysics(9);
+  assert.equal(reset.wallHealth[0], reset.breakableWalls[0].durability);
+  assert.equal(reset.wallBroken[0], false);
+});
+
+test("level nine has a verified smash-and-return solution", () => {
+  const world = freshPhysics(9);
+  applySneeze(world, 1, 0, 1);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(world.wallBroken[0], true);
+  assert.equal(world.wallHealth[0], 0);
+
+  const radians = (145 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.95);
+  for (let frame = 0; frame < 300 && world.goalHold < 0.6; frame += 1) {
+    stepPhysics(world, 1 / 60);
+  }
+
+  assert.ok(world.goalHold >= 0.6);
+  assert.ok(world.cat.x > world.breakableWalls[0].x + world.breakableWalls[0].width);
+});
+
 test("power is clamped between minimum and maximum", () => {
   assert.equal(powerForDistance(0), 0.25);
   assert.equal(powerForDistance(MAX_AIM_DISTANCE / 2), 0.5);
@@ -465,5 +521,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 6), true);
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 7), true);
   assert.equal(isRestingOnCushion({ x: 280, y: 425, vx: 2, vy: 1 }, 8), true);
+  assert.equal(isRestingOnCushion({ x: 220, y: 520, vx: 2, vy: 1 }, 9), true);
   assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });
