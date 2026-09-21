@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   BOX_HALF,
+  BALLOON_R,
   CAT_R,
   FLOOR_Y,
   LEFT_WALL,
+  RIGHT_WALL,
   LEVELS,
   MAX_AIM_DISTANCE,
   applySneeze,
@@ -189,13 +191,64 @@ test("level progression stops after level four and restart preserves the current
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
-  assert.equal(nextLevel(4), null);
+  assert.equal(nextLevel(4), 5);
+  assert.equal(nextLevel(5), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
+  assert.deepEqual(freshPhysics(nextLevel(4)), freshPhysics(5));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
+  assert.deepEqual(freshPhysics(5), freshPhysics(5));
+});
+
+test("level five balloon responds farther than a box to the same wind", () => {
+  const boxWorld = freshPhysics(2);
+  const balloonWorld = freshPhysics(5);
+  const boxStart = boxWorld.box.x;
+  const balloonStart = balloonWorld.balloon.x;
+
+  applySneeze(boxWorld, -1, 0, 0.4);
+  applySneeze(balloonWorld, -1, 0, 0.4);
+  for (let frame = 0; frame < 8; frame += 1) {
+    stepPhysics(boxWorld, 1 / 60);
+    stepPhysics(balloonWorld, 1 / 60);
+  }
+
+  assert.ok(balloonStart - balloonWorld.balloon.x > (boxStart - boxWorld.box.x) * 1.8);
+  assert.ok(balloonWorld.balloon.y < FLOOR_Y - BALLOON_R, "the balloon should start floating upward");
+});
+
+test("level five keeps the goal locked until the balloon is cleared", () => {
+  const world = freshPhysics(5);
+  world.balloon.x = 280;
+  world.cat = { x: 145, y: 520, vx: 0, vy: 0 };
+
+  for (let frame = 0; frame < 60; frame += 1) stepPhysics(world, 1 / 60);
+  assert.equal(world.goalHold, 0);
+
+  world.balloonCleared = true;
+  for (let frame = 0; frame < 60; frame += 1) stepPhysics(world, 1 / 60);
+  assert.ok(world.goalHold >= 0.6);
+});
+
+test("level five has a verified light-puff and return solution", () => {
+  const world = freshPhysics(5);
+  applySneeze(world, -1, 0, 0.4);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(world.balloonCleared, true);
+  assert.ok(world.balloon.x >= LEFT_WALL + BALLOON_R);
+  assert.ok(world.balloon.x <= RIGHT_WALL - BALLOON_R);
+
+  const radians = (45 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.95);
+  for (let frame = 0; frame < 300 && world.goalHold < 0.6; frame += 1) {
+    stepPhysics(world, 1 / 60);
+  }
+
+  assert.ok(world.goalHold >= 0.6);
 });
 
 test("power is clamped between minimum and maximum", () => {
@@ -225,5 +278,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.ok(LEVELS[2].box.x > LEVELS[2].goal.left);
   assert.ok(LEVELS[3].goal.right <= LEVELS[3].iceZones[0].x);
   assert.equal(isRestingOnCushion({ x: 280, y: 380, vx: 2, vy: 1 }, 4), true);
+  assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 5), true);
   assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });
