@@ -18,6 +18,8 @@ import {
   movingPlatformPosition,
   nextLevel,
   powerForDistance,
+  releaseRope,
+  ropeEndPosition,
   sneezeVelocity,
   stepPhysics,
 } from "../src/physics.ts";
@@ -189,7 +191,7 @@ test("level four uses its spring to reach the raised cushion", () => {
   assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
-test("level progression reaches level ten and restart preserves the current level", () => {
+test("level progression reaches level eleven and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
@@ -199,7 +201,8 @@ test("level progression reaches level ten and restart preserves the current leve
   assert.equal(nextLevel(7), 8);
   assert.equal(nextLevel(8), 9);
   assert.equal(nextLevel(9), 10);
-  assert.equal(nextLevel(10), null);
+  assert.equal(nextLevel(10), 11);
+  assert.equal(nextLevel(11), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
@@ -209,6 +212,7 @@ test("level progression reaches level ten and restart preserves the current leve
   assert.deepEqual(freshPhysics(nextLevel(7)), freshPhysics(8));
   assert.deepEqual(freshPhysics(nextLevel(8)), freshPhysics(9));
   assert.deepEqual(freshPhysics(nextLevel(9)), freshPhysics(10));
+  assert.deepEqual(freshPhysics(nextLevel(10)), freshPhysics(11));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
@@ -218,6 +222,7 @@ test("level progression reaches level ten and restart preserves the current leve
   assert.deepEqual(freshPhysics(8), freshPhysics(8));
   assert.deepEqual(freshPhysics(9), freshPhysics(9));
   assert.deepEqual(freshPhysics(10), freshPhysics(10));
+  assert.deepEqual(freshPhysics(11), freshPhysics(11));
 });
 
 test("level five balloon responds farther than a box to the same wind", () => {
@@ -559,6 +564,102 @@ test("level ten has a verified timed platform departure", () => {
   assert.equal(world.platformContacts[0], false);
 });
 
+test("level eleven automatically grabs the rope and keeps its fixed length", () => {
+  const world = freshPhysics(11);
+  const rope = world.ropes[0];
+  const initialEnd = ropeEndPosition(world, 0);
+
+  assert.deepEqual(initialEnd, {
+    x: rope.anchorX,
+    y: rope.anchorY + rope.length,
+  });
+  assert.equal(world.ropeAttached, null);
+  assert.equal(world.ropeEverGrabbed, false);
+
+  world.cat = { x: initialEnd.x - 8, y: initialEnd.y, vx: 260, vy: 0 };
+  stepPhysics(world, 1 / 60);
+
+  assert.equal(world.ropeAttached, 0);
+  assert.equal(world.ropeEverGrabbed, true);
+  for (let frame = 0; frame < 120; frame += 1) {
+    stepPhysics(world, 1 / 60);
+    const distance = Math.hypot(
+      world.cat.x - rope.anchorX,
+      world.cat.y - rope.anchorY,
+    );
+    assert.ok(Math.abs(distance - rope.length) < 0.001);
+  }
+});
+
+test("level eleven sneeze accelerates the swing and release preserves momentum", () => {
+  const world = freshPhysics(11);
+  const rope = world.ropes[0];
+  world.cat = {
+    x: rope.anchorX,
+    y: rope.anchorY + rope.length,
+    vx: 0,
+    vy: 0,
+  };
+  stepPhysics(world, 1 / 60);
+  assert.equal(world.ropeAttached, 0);
+
+  applySneeze(world, -1, 0, 0.4);
+  for (let frame = 0; frame < 20; frame += 1) stepPhysics(world, 1 / 60);
+  assert.ok(world.cat.x > rope.anchorX + 45);
+  assert.ok(world.ropeAngularVelocities[0] > 0);
+
+  const velocityBeforeRelease = { vx: world.cat.vx, vy: world.cat.vy };
+  assert.equal(releaseRope(world), true);
+  assert.equal(world.ropeAttached, null);
+  assert.ok(Math.abs(world.cat.vx - velocityBeforeRelease.vx) < 0.001);
+  assert.ok(Math.abs(world.cat.vy - velocityBeforeRelease.vy) < 0.001);
+  stepPhysics(world, 1 / 60);
+  assert.equal(world.ropeAttached, null, "release cooldown must prevent an immediate re-grab");
+
+  const reset = freshPhysics(11);
+  assert.equal(reset.ropeAttached, null);
+  assert.equal(reset.ropeEverGrabbed, false);
+  assert.deepEqual(reset.ropeAngles, [0]);
+  assert.deepEqual(reset.ropeAngularVelocities, [0]);
+});
+
+test("level eleven has a verified grab, boosted swing, release, and landing", () => {
+  for (const launchAngle of [115, 120, 125]) {
+    const world = freshPhysics(11);
+    const launchRadians = (launchAngle * Math.PI) / 180;
+    applySneeze(world, Math.cos(launchRadians), Math.sin(launchRadians), 1);
+
+    let caughtAt = -1;
+    let boosted = false;
+    let released = false;
+    for (let frame = 0; frame < 360 && world.goalHold < 0.6; frame += 1) {
+      stepPhysics(world, 1 / 60);
+      assert.ok(world.cat.x <= RIGHT_WALL - CAT_R + 0.001);
+      if (world.ropeAttached !== null && caughtAt < 0) caughtAt = frame;
+      if (caughtAt >= 0 && !boosted && frame - caughtAt >= 24) {
+        applySneeze(world, -1, 0, 1);
+        boosted = true;
+      }
+      if (
+        boosted &&
+        !released &&
+        world.ropeAttached !== null &&
+        world.cat.x > 303 &&
+        Math.abs(world.cat.vx) < 50
+      ) {
+        released = releaseRope(world);
+      }
+    }
+
+    assert.ok(caughtAt >= 0, `the ${launchAngle} degree shot should meet the rope end`);
+    assert.equal(boosted, true);
+    assert.equal(released, true);
+    assert.equal(world.ropeAttached, null);
+    assert.ok(world.goalHold >= 0.6, `expected clear from ${launchAngle} degrees`);
+    assert.ok(world.cat.y < FLOOR_Y - CAT_R - 30);
+  }
+});
+
 test("power is clamped between minimum and maximum", () => {
   assert.equal(powerForDistance(0), 0.25);
   assert.equal(powerForDistance(MAX_AIM_DISTANCE / 2), 0.5);
@@ -592,5 +693,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 280, y: 425, vx: 2, vy: 1 }, 8), true);
   assert.equal(isRestingOnCushion({ x: 220, y: 520, vx: 2, vy: 1 }, 9), true);
   assert.equal(isRestingOnCushion({ x: 305, y: 430, vx: 2, vy: 1 }, 10), true);
+  assert.equal(isRestingOnCushion({ x: 305, y: 465, vx: 2, vy: 1 }, 11), true);
   assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });

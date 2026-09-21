@@ -8,6 +8,7 @@ import {
   LEVELS,
   LEFT_WALL,
   MAX_AIM_DISTANCE,
+  ROPE_SNEEZE_SCALE,
   RIGHT_WALL,
   WORLD_H,
   WORLD_W,
@@ -17,6 +18,8 @@ import {
   isSeesawReady,
   nextLevel,
   powerForDistance,
+  releaseRope,
+  ropeEndPosition,
   stepPhysics,
   type AimState,
   type LevelId,
@@ -86,9 +89,11 @@ export default function Home() {
   const cooldownUntilRef = useRef(0);
   const statusRef = useRef<PlayStatus>("playing");
   const shotsRef = useRef(0);
+  const ropeAttachedUiRef = useRef(false);
   const [status, setStatus] = useState<PlayStatus>("playing");
   const [shots, setShots] = useState(0);
   const [level, setLevel] = useState<LevelId>(1);
+  const [ropeAttached, setRopeAttached] = useState(false);
 
   const resetGame = useCallback(() => {
     physicsRef.current = freshPhysics(levelRef.current);
@@ -98,8 +103,10 @@ export default function Home() {
     cooldownUntilRef.current = 0;
     statusRef.current = "playing";
     shotsRef.current = 0;
+    ropeAttachedUiRef.current = false;
     setStatus("playing");
     setShots(0);
+    setRopeAttached(false);
   }, []);
 
   const startNextLevel = useCallback(() => {
@@ -113,8 +120,17 @@ export default function Home() {
     cooldownUntilRef.current = 0;
     statusRef.current = "playing";
     shotsRef.current = 0;
+    ropeAttachedUiRef.current = false;
     setStatus("playing");
     setShots(0);
+    setRopeAttached(false);
+  }, []);
+
+  const handleReleaseRope = useCallback(() => {
+    if (!releaseRope(physicsRef.current)) return;
+    aimRef.current.active = false;
+    ropeAttachedUiRef.current = false;
+    setRopeAttached(false);
   }, []);
 
   useEffect(() => {
@@ -146,6 +162,12 @@ export default function Home() {
       const world = physicsRef.current;
       stepPhysics(world, dt);
 
+      const isAttached = world.ropeAttached !== null;
+      if (isAttached !== ropeAttachedUiRef.current) {
+        ropeAttachedUiRef.current = isAttached;
+        setRopeAttached(isAttached);
+      }
+
       if (sneezeRef.current) {
         sneezeRef.current.age += dt;
         if (sneezeRef.current.age > 0.42) sneezeRef.current = null;
@@ -172,6 +194,7 @@ export default function Home() {
       const dirY = dy / distance;
       const power = powerForDistance(distance);
       const length = Math.min(distance, MAX_AIM_DISTANCE);
+      const recoilScale = world.ropeAttached === null ? 1 : ROPE_SNEEZE_SCALE;
 
       ctx.save();
       ctx.fillStyle = "rgba(65, 190, 255, 0.16)";
@@ -185,18 +208,33 @@ export default function Home() {
       drawArrow(ctx, cat.x + dirX * 30, cat.y + dirY * 30, cat.x + dirX * length, cat.y + dirY * length, "#2aa8ef", 7);
       drawArrow(ctx, cat.x - dirX * 28, cat.y - dirY * 28, cat.x - dirX * (34 + length * 0.48), cat.y - dirY * (34 + length * 0.48), "#f6bc32", 6);
 
-      const launchSpeed = 320 + 210 * power;
+      const launchSpeed = (320 + 210 * power) * recoilScale;
       const vx = -dirX * launchSpeed;
-      const vy = -dirY * (260 + 160 * power);
+      const vy = -dirY * (260 + 160 * power) * recoilScale;
       ctx.fillStyle = "rgba(246, 188, 50, 0.72)";
-      for (let i = 1; i <= 8; i += 1) {
-        const t = i * 0.105;
-        const px = cat.x + vx * t;
-        const py = cat.y + vy * t + 0.5 * 1180 * t * t;
-        if (px < LEFT_WALL || px > RIGHT_WALL || py > FLOOR_Y) break;
-        ctx.beginPath();
-        ctx.arc(px, py, Math.max(2.4, 5 - i * 0.32), 0, Math.PI * 2);
-        ctx.fill();
+      if (world.ropeAttached !== null) {
+        const rope = world.ropes[world.ropeAttached];
+        const angle = world.ropeAngles[world.ropeAttached] ?? 0;
+        const tangentImpulse = vx * Math.cos(angle) - vy * Math.sin(angle);
+        const swingDirection = tangentImpulse >= 0 ? 1 : -1;
+        for (let i = 1; i <= 8; i += 1) {
+          const previewAngle = angle + swingDirection * i * 0.035;
+          const px = rope.anchorX + Math.sin(previewAngle) * rope.length;
+          const py = rope.anchorY + Math.cos(previewAngle) * rope.length;
+          ctx.beginPath();
+          ctx.arc(px, py, Math.max(2.4, 5 - i * 0.32), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        for (let i = 1; i <= 8; i += 1) {
+          const t = i * 0.105;
+          const px = cat.x + vx * t;
+          const py = cat.y + vy * t + 0.5 * 1180 * t * t;
+          if (px < LEFT_WALL || px > RIGHT_WALL || py > FLOOR_Y) break;
+          ctx.beginPath();
+          ctx.arc(px, py, Math.max(2.4, 5 - i * 0.32), 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       roundedRect(ctx, 94, 76, 172, 42, 21);
@@ -217,7 +255,8 @@ export default function Home() {
         (world.level === 5 && !world.balloonCleared) ||
         (world.level === 6 && !world.switchOn.every(Boolean)) ||
         (world.level === 8 && !isSeesawReady(world)) ||
-        (world.level === 9 && !world.wallBroken.every(Boolean))
+        (world.level === 9 && !world.wallBroken.every(Boolean)) ||
+        (world.level === 11 && (!world.ropeEverGrabbed || world.ropeAttached !== null))
       );
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
@@ -310,6 +349,62 @@ export default function Home() {
         ctx.lineTo(position.x + position.width / 2 + 13, position.y + 4);
         ctx.closePath();
         ctx.fill();
+      });
+
+      world.ropes.forEach((rope, index) => {
+        const end = ropeEndPosition(world, index);
+        if (!end) return;
+        const attached = world.ropeAttached === index;
+
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.shadowColor = attached ? "rgba(55, 181, 105, .42)" : "rgba(91, 59, 32, .24)";
+        ctx.shadowBlur = attached ? 14 : 7;
+        ctx.strokeStyle = attached ? "#237948" : "#76502e";
+        ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.moveTo(rope.anchorX, rope.anchorY);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = attached ? "#8cd7ab" : "#d6a85f";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(rope.anchorX, rope.anchorY);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+
+        roundedRect(ctx, rope.anchorX - 24, rope.anchorY - 12, 48, 20, 8);
+        ctx.fillStyle = "#4d566d";
+        ctx.fill();
+        ctx.strokeStyle = "#26334d";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "#9aa5ba";
+        ctx.beginPath();
+        ctx.arc(rope.anchorX, rope.anchorY - 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowColor = attached ? "rgba(55, 181, 105, .6)" : "rgba(246, 188, 50, .48)";
+        ctx.shadowBlur = attached ? 18 : 11;
+        ctx.fillStyle = attached ? "#69cf91" : "#f6bc32";
+        ctx.strokeStyle = attached ? "#237948" : "#82502a";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(end.x, end.y, attached ? 14 : 12, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        if (attached) {
+          roundedRect(ctx, end.x - 32, end.y - 55, 64, 25, 12);
+          ctx.fillStyle = "#237948";
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "900 10px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("つかんだ！", end.x, end.y - 42);
+        }
       });
 
       world.springs.forEach((spring, index) => {
@@ -499,6 +594,8 @@ export default function Home() {
                 ? "かたむき待ち"
                 : world.level === 9
                   ? "カベ待ち"
+                  : world.level === 11
+                    ? (world.ropeAttached !== null ? "はなして着地" : "ロープ待ち")
                   : "ふうせん待ち")
           : "おひるね",
         goalX + goalWidth / 2,
@@ -619,10 +716,13 @@ export default function Home() {
       const showLevelEightGuide = world.level === 8 && shotsRef.current < 2;
       const showLevelNineGuide = world.level === 9 && shotsRef.current < 2;
       const showLevelTenGuide = world.level === 10 && shotsRef.current < 1;
+      const showLevelElevenGuide = world.level === 11 && (
+        !world.ropeEverGrabbed || world.ropeAttached !== null
+      );
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -634,9 +734,10 @@ export default function Home() {
         const isLevelEight = world.level === 8;
         const isLevelNine = world.level === 9;
         const isLevelTen = world.level === 10;
+        const isLevelEleven = world.level === 11;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -738,6 +839,21 @@ export default function Home() {
           );
           ctx.fillStyle = "#26334d";
           ctx.fillText("反動で右上のクッションへ", 180, 187);
+        } else if (isLevelEleven) {
+          const holdingRope = world.ropeAttached !== null;
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = holdingRope ? "#28794f" : "#82502a";
+          ctx.fillText(
+            holdingRope ? "ロープをつかんだ！" : "① 左下へ長く → ロープへ",
+            180,
+            158,
+          );
+          ctx.fillStyle = "#26334d";
+          ctx.fillText(
+            holdingRope ? "② 左へ長く → 右でボタン" : "近づくと自動でつかまる！",
+            180,
+            187,
+          );
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -853,7 +969,9 @@ export default function Home() {
                               ? "箱をシーソーの左側へ動かすと、反対側が高く上がります。右下へ短くドラッグし、高くなった右側のクッションへ着地しましょう。"
                               : level === 9
                                 ? "右へ長くドラッグし、箱を十分に加速して壁へぶつけます。壁が壊れたら左下へ長くドラッグし、反動で開いた通路を抜けましょう。"
-                                : "ネコは水色の足場に乗ったまま運ばれます。足場が右端へ近づいた瞬間に左下へ短くドラッグし、反動で右上の最終クッションへ着地しましょう。"
+                                : level === 10
+                                  ? "ネコは水色の足場に乗ったまま運ばれます。足場が右端へ近づいた瞬間に左下へ短くドラッグし、反動で右上のクッションへ着地しましょう。"
+                                  : "左下へ長くドラッグしてロープへ飛び、近づくと自動でつかまります。くしゃみの反動で右へ揺れ、ロープをはなすボタンで高いクッションへ着地しましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -869,8 +987,25 @@ export default function Home() {
             <span aria-hidden="true">↻</span>
             やり直す
           </button>
+          {level === 11 && status === "playing" && ropeAttached ? (
+            <button
+              className="rope-release-button"
+              type="button"
+              onClick={handleReleaseRope}
+              aria-label="ロープをはなして、そのままの勢いで飛ぶ"
+            >
+              ロープをはなす
+              <span aria-hidden="true">→</span>
+            </button>
+          ) : null}
           <div className="status-live" aria-live="polite">
-            {status === "won" ? "クリア。おひるね成功！" : status === "failed" ? "失敗。もう一度挑戦できます。" : ""}
+            {status === "won"
+              ? "クリア。おひるね成功！"
+              : status === "failed"
+                ? "失敗。もう一度挑戦できます。"
+                : ropeAttached
+                  ? "ロープをつかみました。右へ揺れたらロープをはなせます。"
+                  : ""}
           </div>
           {status === "won" ? (
             <div className="win-overlay">
@@ -900,7 +1035,9 @@ export default function Home() {
                                   ? "つぎは壁を壊そう"
                                   : level === 9
                                     ? "つぎは動く足場へ"
-                                    : "全レベル クリア！"}
+                                    : level === 10
+                                      ? "つぎはロープにつかまろう"
+                                      : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (

@@ -9,8 +9,9 @@ export const BALLOON_R = 18;
 export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
+export const ROPE_SNEEZE_SCALE = 0.45;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 export type Obstacle = {
   x: number;
@@ -60,6 +61,13 @@ export type MovingPlatform = Obstacle & {
   phase: number;
 };
 
+export type Rope = {
+  anchorX: number;
+  anchorY: number;
+  length: number;
+  grabRadius: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -74,6 +82,7 @@ export type LevelDefinition = {
   seesaws: Seesaw[];
   breakableWalls: BreakableWall[];
   movingPlatforms: MovingPlatform[];
+  ropes: Rope[];
   hint: string;
 };
 
@@ -109,6 +118,12 @@ export type PhysicsState = {
   platformTime: number;
   platformPositions: Obstacle[];
   platformContacts: boolean[];
+  ropes: Rope[];
+  ropeAngles: number[];
+  ropeAngularVelocities: number[];
+  ropeAttached: number | null;
+  ropeGrabCooldown: number;
+  ropeEverGrabbed: boolean;
   goalHold: number;
 };
 
@@ -141,6 +156,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     seesaws: [],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -157,6 +173,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     seesaws: [],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
@@ -173,6 +190,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     seesaws: [],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "氷の上はツルツル！",
   },
   4: {
@@ -189,6 +207,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     seesaws: [],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "バネに乗って高い足場へ！",
   },
   5: {
@@ -205,6 +224,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     seesaws: [],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "弱い風で風船をどかそう！",
   },
   6: {
@@ -221,6 +241,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     seesaws: [],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "箱を置いてスイッチON！",
   },
   7: {
@@ -237,6 +258,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     seesaws: [],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "スイッチでゲートOPEN！",
   },
   8: {
@@ -260,6 +282,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     }],
     breakableWalls: [],
     movingPlatforms: [],
+    ropes: [],
     hint: "箱でシーソーを傾けよう！",
   },
   9: {
@@ -283,6 +306,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
       minImpact: 330,
     }],
     movingPlatforms: [],
+    ropes: [],
     hint: "箱を加速して壁を壊せ！",
   },
   10: {
@@ -308,7 +332,30 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
       period: 4,
       phase: -Math.PI / 2,
     }],
+    ropes: [],
     hint: "右端でタイミングよく飛ぼう！",
+  },
+  11: {
+    id: 11,
+    cat: { x: 60, y: FLOOR_Y - CAT_R },
+    box: null,
+    balloon: null,
+    goal: { left: 284, right: 330, top: 440, bottom: 468 },
+    obstacles: [{ x: 274, y: 490, width: 68, height: 55 }],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [],
+    movingPlatforms: [],
+    ropes: [{
+      anchorX: 170,
+      anchorY: 105,
+      length: 365,
+      grabRadius: 38,
+    }],
+    hint: "ロープで右の足場へ！",
   },
 };
 
@@ -322,6 +369,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 7) return 8;
   if (level === 8) return 9;
   if (level === 9) return 10;
+  if (level === 10) return 11;
   return null;
 }
 
@@ -333,6 +381,16 @@ export function movingPlatformPosition(platform: MovingPlatform, time: number): 
     y: platform.axis === "y" ? platform.y + offset : platform.y,
     width: platform.width,
     height: platform.height,
+  };
+}
+
+export function ropeEndPosition(world: PhysicsState, index: number) {
+  const rope = world.ropes[index];
+  if (!rope) return null;
+  const angle = world.ropeAngles[index] ?? 0;
+  return {
+    x: rope.anchorX + Math.sin(angle) * rope.length,
+    y: rope.anchorY + Math.cos(angle) * rope.length,
   };
 }
 
@@ -363,6 +421,12 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
       (platform) => movingPlatformPosition(platform, 0),
     ),
     platformContacts: definition.movingPlatforms.map(() => false),
+    ropes: definition.ropes.map((rope) => ({ ...rope })),
+    ropeAngles: definition.ropes.map(() => 0),
+    ropeAngularVelocities: definition.ropes.map(() => 0),
+    ropeAttached: null,
+    ropeGrabCooldown: 0,
+    ropeEverGrabbed: false,
     goalHold: 0,
   };
 }
@@ -403,8 +467,9 @@ export function applySneeze(
   power: number,
 ) {
   const velocity = sneezeVelocity(dirX, dirY, power);
-  world.cat.vx += velocity.vx;
-  world.cat.vy += velocity.vy;
+  const recoilScale = world.ropeAttached === null ? 1 : ROPE_SNEEZE_SCALE;
+  world.cat.vx += velocity.vx * recoilScale;
+  world.cat.vy += velocity.vy * recoilScale;
 
   let movedObject = false;
   const box = world.box;
@@ -800,6 +865,98 @@ function stepMovingPlatforms(world: PhysicsState, dt: number) {
   });
 }
 
+function attachToRope(world: PhysicsState, index: number) {
+  const rope = world.ropes[index];
+  if (!rope) return false;
+
+  const dx = world.cat.x - rope.anchorX;
+  const dy = world.cat.y - rope.anchorY;
+  const distance = Math.hypot(dx, dy);
+  const angle = distance > 0.001 ? Math.atan2(dx, dy) : 0;
+  const tangentX = Math.cos(angle);
+  const tangentY = -Math.sin(angle);
+  const tangentSpeed = (world.cat.vx * tangentX + world.cat.vy * tangentY) * 0.55;
+
+  world.ropeAngles[index] = angle;
+  world.ropeAngularVelocities[index] = tangentSpeed / rope.length;
+  world.ropeAttached = index;
+  world.ropeEverGrabbed = true;
+  world.cat.x = rope.anchorX + Math.sin(angle) * rope.length;
+  world.cat.y = rope.anchorY + Math.cos(angle) * rope.length;
+  world.cat.vx = tangentX * tangentSpeed;
+  world.cat.vy = tangentY * tangentSpeed;
+  return true;
+}
+
+function constrainCatToRope(world: PhysicsState, index: number) {
+  const rope = world.ropes[index];
+  if (!rope) {
+    world.ropeAttached = null;
+    return;
+  }
+
+  const dx = world.cat.x - rope.anchorX;
+  const dy = world.cat.y - rope.anchorY;
+  const minAngle = Math.asin(clamp((LEFT_WALL + CAT_R - rope.anchorX) / rope.length, -1, 1));
+  const maxAngle = Math.asin(clamp((RIGHT_WALL - CAT_R - rope.anchorX) / rope.length, -1, 1));
+  const angle = clamp(Math.atan2(dx, dy), minAngle, maxAngle);
+  const tangentX = Math.cos(angle);
+  const tangentY = -Math.sin(angle);
+  const tangentSpeed = world.cat.vx * tangentX + world.cat.vy * tangentY;
+
+  world.ropeAngles[index] = angle;
+  world.ropeAngularVelocities[index] = tangentSpeed / rope.length;
+  world.cat.x = rope.anchorX + Math.sin(angle) * rope.length;
+  world.cat.y = rope.anchorY + Math.cos(angle) * rope.length;
+  world.cat.vx = tangentX * tangentSpeed;
+  world.cat.vy = tangentY * tangentSpeed;
+}
+
+function stepRopes(world: PhysicsState, dt: number) {
+  world.ropeGrabCooldown = Math.max(0, world.ropeGrabCooldown - dt);
+
+  world.ropes.forEach((rope, index) => {
+    if (world.ropeAttached === index) return;
+    let angle = world.ropeAngles[index] ?? 0;
+    let angularVelocity = world.ropeAngularVelocities[index] ?? 0;
+    angularVelocity += -(1180 / rope.length) * Math.sin(angle) * dt;
+    angularVelocity *= Math.pow(0.992, dt * 60);
+    angle += angularVelocity * dt;
+    world.ropeAngles[index] = angle;
+    world.ropeAngularVelocities[index] = angularVelocity;
+  });
+
+  if (world.ropeAttached !== null) {
+    constrainCatToRope(world, world.ropeAttached);
+    return;
+  }
+  if (world.ropeGrabCooldown > 0) return;
+
+  for (let index = 0; index < world.ropes.length; index += 1) {
+    const rope = world.ropes[index];
+    const end = ropeEndPosition(world, index);
+    if (!end) continue;
+    if (Math.hypot(world.cat.x - end.x, world.cat.y - end.y) <= rope.grabRadius) {
+      attachToRope(world, index);
+      return;
+    }
+  }
+}
+
+export function releaseRope(world: PhysicsState) {
+  if (world.ropeAttached === null) return false;
+  const index = world.ropeAttached;
+  const rope = world.ropes[index];
+  const angle = world.ropeAngles[index] ?? 0;
+  const tangentX = Math.cos(angle);
+  const tangentY = -Math.sin(angle);
+  const tangentSpeed = world.cat.vx * tangentX + world.cat.vy * tangentY;
+  if (rope) world.ropeAngularVelocities[index] = tangentSpeed / rope.length;
+  world.ropeAttached = null;
+  world.ropeGrabCooldown = 0.9;
+  return true;
+}
+
 export function stepPhysics(world: PhysicsState, dt: number) {
   movePlatformsAndCarry(world, dt);
   const bodies = world.box ? [world.cat, world.box] : [world.cat];
@@ -841,11 +998,13 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   stepBreakableWalls(world);
   stepSeesaws(world, dt);
   stepMovingPlatforms(world, dt);
+  stepRopes(world, dt);
 
   const goalUnlocked = (
     (world.level !== 5 || world.balloonCleared) &&
     (world.level !== 6 || world.switchOn.every(Boolean)) &&
     (world.level !== 9 || world.wallBroken.every(Boolean)) &&
+    (world.level !== 11 || (world.ropeEverGrabbed && world.ropeAttached === null)) &&
     isSeesawReady(world)
   );
   const restingOnCushion = goalUnlocked && isRestingOnCushion(world.cat, world.level);

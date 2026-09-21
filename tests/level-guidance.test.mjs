@@ -79,9 +79,18 @@ test("level ten explains the moving-platform timing window", () => {
   assert.match(appSource, /足場が右端まで来たら…/);
   assert.match(appSource, /いま！ 左下へ短く/);
   assert.match(appSource, /反動で右上のクッションへ/);
-  assert.match(appSource, /level === 9[\s\S]*足場が右端へ近づいた瞬間に左下へ短くドラッグ[\s\S]*最終クッションへ着地/);
+  assert.match(appSource, /level === 10[\s\S]*足場が右端へ近づいた瞬間に左下へ短くドラッグ[\s\S]*右上のクッションへ着地/);
+});
+
+test("level eleven explains automatic rope grab, swing boost, and release", () => {
+  assert.match(appSource, /world\.level === 11 && \([\s\S]*!world\.ropeEverGrabbed \|\| world\.ropeAttached !== null/);
+  assert.match(appSource, /① 左下へ長く → ロープへ/);
+  assert.match(appSource, /近づくと自動でつかまる！/);
+  assert.match(appSource, /ロープをつかんだ！/);
+  assert.match(appSource, /② 左へ長く → 右でボタン/);
+  assert.match(appSource, /左下へ長くドラッグしてロープへ飛び[\s\S]*ロープをはなすボタンで高いクッションへ着地/);
 });
 
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*つぎはロープにつかまろう[\s\S]*全レベル クリア！/);
 });
