@@ -10,11 +10,11 @@ import {
   RIGHT_WALL,
   WORLD_H,
   WORLD_W,
+  applySneeze,
   clamp,
   freshPhysics,
   nextLevel,
   powerForDistance,
-  sneezeVelocity,
   stepPhysics,
   type AimState,
   type LevelId,
@@ -336,14 +336,17 @@ export default function Home() {
       drawAim(world);
 
       const showLevelThreeGuide = world.level === 3 && shotsRef.current < 2;
+      const showLevelFourGuide = world.level === 4 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelThreeGuide)
+        (shotsRef.current === 0 || showLevelThreeGuide || showLevelFourGuide)
       ) {
         const isLevelThree = world.level === 3;
+        const isLevelFour = world.level === 4;
         const reachedLeftWall = world.cat.x <= LEFT_WALL + CAT_R + 8;
-        roundedRect(ctx, 39, 132, 282, isLevelThree ? 82 : 70, 18);
+        const movedBoxAside = world.box !== null && world.box.x <= 100;
+        roundedRect(ctx, 39, 132, 282, isLevelThree || isLevelFour ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -358,6 +361,16 @@ export default function Home() {
           );
           ctx.fillStyle = reachedLeftWall ? "#26334d" : "#59657c";
           ctx.fillText("② 左下へ長くドラッグ → 壁越え", 180, 187);
+        } else if (isLevelFour) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = movedBoxAside ? "#28794f" : "#26334d";
+          ctx.fillText(
+            movedBoxAside ? "① 箱をどかせた！" : "① 左へ長くドラッグ → 箱を押す",
+            180,
+            158,
+          );
+          ctx.fillStyle = movedBoxAside ? "#26334d" : "#59657c";
+          ctx.fillText("② 右下へ長くドラッグ → ゴール", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -428,21 +441,7 @@ export default function Home() {
     const dirY = dy / distance;
     const power = powerForDistance(distance);
     lastAimRef.current = { x: dirX, y: dirY };
-    const velocity = sneezeVelocity(dirX, dirY, power);
-    cat.vx += velocity.vx;
-    cat.vy += velocity.vy;
-
-    const box = physicsRef.current.box;
-    if (box) {
-      const toBoxX = box.x - cat.x;
-      const toBoxY = box.y - cat.y;
-      const boxDistance = Math.hypot(toBoxX, toBoxY);
-      const coneDot = boxDistance > 0 ? (toBoxX * dirX + toBoxY * dirY) / boxDistance : -1;
-      if (boxDistance < 155 && coneDot > 0.82) {
-        box.vx += dirX * (230 + 220 * power);
-        box.vy += dirY * (130 + 130 * power) - 50 * power;
-      }
-    }
+    applySneeze(physicsRef.current, dirX, dirY, power);
 
     sneezeRef.current = { age: 0, dirX, dirY, power };
     cooldownUntilRef.current = performance.now() + 600;
@@ -473,7 +472,9 @@ export default function Home() {
                 ? "ネコを押して右へドラッグし、離すとくしゃみます。ネコは反動で左へ動きます。"
                 : level === 2
                   ? "ネコを押して左下へ長くドラッグし、離すとくしゃみます。ネコは反動で右上へ動きます。"
-                  : "最初はネコを右へ長くドラッグして左壁まで移動します。次に左下へ長くドラッグし、反動で中央の壁を越えます。"
+                  : level === 3
+                    ? "最初はネコを右へ長くドラッグして左壁まで移動します。次に左下へ長くドラッグし、反動で中央の壁を越えます。"
+                    : "最初はネコを左へ長くドラッグし、風で箱を左へ押しながら反動で右へ移動します。次に右下へ長くドラッグし、箱が空けたクッションへ戻ります。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -506,7 +507,9 @@ export default function Home() {
                     ? "つぎは障害物をこえよう"
                     : level === 2
                       ? "つぎは壁で向きを変えよう"
-                      : "全レベル クリア！"}
+                      : level === 3
+                        ? "つぎは箱をどけよう"
+                        : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (
