@@ -27,14 +27,13 @@ test("level three explains the low-friction ice surface", () => {
   assert.match(appSource, /level === 3[\s\S]*氷の上ではネコが長く滑ります[\s\S]*氷の先のクッションで止まりましょう/);
 });
 
-test("level four explains how wind and recoil move the box and cat apart", () => {
-  assert.match(appSource, /world\.level === 4 && shotsRef\.current < 2/);
-  assert.match(appSource, /① 左へ長くドラッグ → 箱を押す/);
-  assert.match(appSource, /① 箱をどかせた！/);
-  assert.match(appSource, /② 右下へ長くドラッグ → ゴール/);
-  assert.match(appSource, /風で箱を左へ押しながら反動で右へ移動[\s\S]*箱が空けたクッションへ戻ります/);
+test("level four explains the automatic spring jump", () => {
+  assert.match(appSource, /world\.level === 4 && shotsRef\.current < 1/);
+  assert.match(appSource, /バネに乗ると自動でジャンプ！/);
+  assert.match(appSource, /左へ長くドラッグ → 右へ反動/);
+  assert.match(appSource, /level === 3[\s\S]*ネコを左へ長くドラッグ[\s\S]*バネで跳ね上がり、高い足場のクッションへ着地/);
 });
 
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*全レベル クリア！/);
 });

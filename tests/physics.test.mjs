@@ -146,52 +146,43 @@ test("level three has a visible ice run and a verified sliding solution", () => 
   assert.ok(world.goalHold >= 0.6, "the cat should slide off the ice and stop on the cushion");
 });
 
-test("level four pushes the box and cat in opposite directions before a tolerant return shot", () => {
-  const secondShotAngles = [37, 41, 45, 49, 53];
-  const secondShotPowers = [0.9, 0.95, 1];
+test("level four spring launches once per contact and rearms after exit", () => {
+  const world = freshPhysics(4);
+  const spring = world.springs[0];
+  world.cat.x = spring.x + spring.width / 2;
 
-  for (const angle of secondShotAngles) {
-    for (const power of secondShotPowers) {
-      const world = freshPhysics(4);
-      const startingCatX = world.cat.x;
-      const startingBoxX = world.box.x;
-      const boxReceivedWind = applySneeze(world, -1, 0, 1);
+  stepPhysics(world, 1 / 60);
+  const firstLaunchVelocity = world.cat.vy;
+  assert.ok(firstLaunchVelocity < -700);
+  assert.equal(world.springArmed[0], false);
 
-      assert.equal(boxReceivedWind, true);
-      for (let frame = 0; frame < 120; frame += 1) {
-        stepPhysics(world, 1 / 60);
-      }
+  stepPhysics(world, 1 / 60);
+  assert.ok(world.cat.vy > firstLaunchVelocity, "gravity should act without a second launch");
 
-      assert.ok(world.cat.x > startingCatX, "the recoil should move the cat right");
-      assert.ok(world.box.x < startingBoxX, "the wind should push the box left");
-      assert.ok(world.box.x <= 100, "the first shot should clear the cushion");
+  world.cat.x = spring.x - 60;
+  stepPhysics(world, 1 / 60);
+  assert.equal(world.springArmed[0], true);
 
-      const radians = (angle * Math.PI) / 180;
-      applySneeze(world, Math.cos(radians), Math.sin(radians), power);
-
-      for (let frame = 0; frame < 240 && world.goalHold < 0.6; frame += 1) {
-        stepPhysics(world, 1 / 60);
-      }
-
-      assert.ok(
-        world.goalHold >= 0.6,
-        `expected Level 4 clear at ${angle} degrees and ${Math.round(power * 100)}% power`,
-      );
-    }
-  }
+  world.cat.x = spring.x + spring.width / 2;
+  world.cat.y = FLOOR_Y - CAT_R;
+  world.cat.vy = 0;
+  stepPhysics(world, 1 / 60);
+  assert.ok(world.cat.vy < -700, "a new contact should launch again");
 });
 
-test("level four cannot use its baseline return shot before moving the box", () => {
+test("level four uses its spring to reach the raised cushion", () => {
   const world = freshPhysics(4);
-  const radians = (45 * Math.PI) / 180;
-  const boxReceivedWind = applySneeze(world, Math.cos(radians), Math.sin(radians), 0.95);
 
-  assert.equal(boxReceivedWind, false, "the box starts behind the return-shot wind");
-  for (let frame = 0; frame < 240; frame += 1) {
+  assert.equal(world.box, null);
+  assert.deepEqual(world.springs, [{ x: 135, width: 65, launchVelocity: 760 }]);
+  assert.deepEqual(world.obstacles, [{ x: 220, y: 405, width: 112, height: 140 }]);
+
+  applySneeze(world, -1, 0, 1);
+  for (let frame = 0; frame < 600 && world.goalHold < 0.6; frame += 1) {
     stepPhysics(world, 1 / 60);
   }
 
-  assert.ok(world.goalHold < 0.6);
+  assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
 test("level progression stops after level four and restart preserves the current level", () => {
@@ -233,5 +224,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 245, y: 520, vx: 2, vy: 1 }, 3), false);
   assert.ok(LEVELS[2].box.x > LEVELS[2].goal.left);
   assert.ok(LEVELS[3].goal.right <= LEVELS[3].iceZones[0].x);
-  assert.ok(LEVELS[4].box.x > LEVELS[4].goal.left);
+  assert.equal(isRestingOnCushion({ x: 280, y: 380, vx: 2, vy: 1 }, 4), true);
+  assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });
