@@ -187,23 +187,26 @@ test("level four uses its spring to reach the raised cushion", () => {
   assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
-test("level progression reaches level six and restart preserves the current level", () => {
+test("level progression reaches level seven and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
   assert.equal(nextLevel(4), 5);
   assert.equal(nextLevel(5), 6);
-  assert.equal(nextLevel(6), null);
+  assert.equal(nextLevel(6), 7);
+  assert.equal(nextLevel(7), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
   assert.deepEqual(freshPhysics(nextLevel(4)), freshPhysics(5));
   assert.deepEqual(freshPhysics(nextLevel(5)), freshPhysics(6));
+  assert.deepEqual(freshPhysics(nextLevel(6)), freshPhysics(7));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
   assert.deepEqual(freshPhysics(5), freshPhysics(5));
   assert.deepEqual(freshPhysics(6), freshPhysics(6));
+  assert.deepEqual(freshPhysics(7), freshPhysics(7));
 });
 
 test("level five balloon responds farther than a box to the same wind", () => {
@@ -303,6 +306,61 @@ test("level six has a verified switch-and-return solution", () => {
   assert.ok(world.goalHold >= 0.6);
 });
 
+test("level seven closed gate blocks both the cat and box", () => {
+  const catWorld = freshPhysics(7);
+  const gate = catWorld.gates[0];
+  const radians = (45 * Math.PI) / 180;
+
+  assert.deepEqual(gate, { x: 207, y: 145, width: 14, height: 400, switchIndex: 0 });
+  assert.deepEqual(catWorld.gateOpen, [false]);
+
+  applySneeze(catWorld, Math.cos(radians), Math.sin(radians), 0.95);
+  for (let frame = 0; frame < 300; frame += 1) stepPhysics(catWorld, 1 / 60);
+  assert.equal(catWorld.goalHold, 0, "the baseline return shot must not cross a closed gate");
+  assert.ok(catWorld.cat.x >= gate.x + gate.width + CAT_R - 0.01);
+
+  const boxWorld = freshPhysics(7);
+  boxWorld.cat.x = 310;
+  boxWorld.box.x = 270;
+  boxWorld.box.vx = -500;
+  for (let frame = 0; frame < 90; frame += 1) stepPhysics(boxWorld, 1 / 60);
+  assert.ok(boxWorld.box.x >= gate.x + gate.width + BOX_HALF - 0.01);
+});
+
+test("level seven gate follows its pressure switch and resets closed", () => {
+  const world = freshPhysics(7);
+  applySneeze(world, -1, 0, 1);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(world.switchOn[0], true);
+  assert.equal(world.gateOpen[0], true);
+
+  world.box.x = 175;
+  world.box.vx = 0;
+  world.box.vy = 0;
+  stepPhysics(world, 1 / 60);
+  assert.equal(world.switchOn[0], false);
+  assert.equal(world.gateOpen[0], false);
+  assert.deepEqual(freshPhysics(7).gateOpen, [false]);
+});
+
+test("level seven has a verified open-gate-and-return solution", () => {
+  const world = freshPhysics(7);
+  applySneeze(world, -1, 0, 1);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(world.gateOpen[0], true);
+
+  const radians = (45 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.95);
+  for (let frame = 0; frame < 300 && world.goalHold < 0.6; frame += 1) {
+    stepPhysics(world, 1 / 60);
+  }
+
+  assert.ok(world.goalHold >= 0.6);
+  assert.equal(world.gateOpen[0], true);
+});
+
 test("power is clamped between minimum and maximum", () => {
   assert.equal(powerForDistance(0), 0.25);
   assert.equal(powerForDistance(MAX_AIM_DISTANCE / 2), 0.5);
@@ -332,5 +390,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 280, y: 380, vx: 2, vy: 1 }, 4), true);
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 5), true);
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 6), true);
+  assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 7), true);
   assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });

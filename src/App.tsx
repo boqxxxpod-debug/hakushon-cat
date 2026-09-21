@@ -303,6 +303,36 @@ export default function Home() {
         ctx.fillText(isOn ? "ON" : "OFF", pressureSwitch.x + pressureSwitch.width / 2, FLOOR_Y + 20);
       });
 
+      world.gates.forEach((gate, index) => {
+        const isOpen = world.gateOpen[index];
+        const panelY = isOpen ? gate.y - gate.height + 82 : gate.y;
+        ctx.fillStyle = "rgba(55, 65, 84, .35)";
+        ctx.fillRect(gate.x - 4, gate.y, 3, gate.height);
+        ctx.fillRect(gate.x + gate.width + 1, gate.y, 3, gate.height);
+        ctx.save();
+        ctx.shadowColor = isOpen ? "rgba(55, 181, 105, .35)" : "rgba(204, 73, 54, .35)";
+        ctx.shadowBlur = 10;
+        roundedRect(ctx, gate.x, panelY, gate.width, gate.height, 5);
+        ctx.fillStyle = isOpen ? "#67c991" : "#d95d4e";
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = isOpen ? "#237948" : "#873328";
+        ctx.lineWidth = 3;
+        roundedRect(ctx, gate.x, panelY, gate.width, gate.height, 5);
+        ctx.stroke();
+        for (let y = panelY + 14; y < panelY + gate.height; y += 28) {
+          ctx.fillStyle = "rgba(255,255,255,.42)";
+          ctx.fillRect(gate.x + 3, y, gate.width - 6, 4);
+        }
+        roundedRect(ctx, gate.x - 27, 96, gate.width + 54, 28, 12);
+        ctx.fillStyle = isOpen ? "#237948" : "#873328";
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "900 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(isOpen ? "OPEN" : "CLOSED", gate.x + gate.width / 2, 110);
+      });
+
       ctx.save();
       ctx.shadowColor = "rgba(52, 110, 80, .2)";
       ctx.shadowBlur = 10;
@@ -436,10 +466,11 @@ export default function Home() {
       const showLevelFourGuide = world.level === 4 && shotsRef.current < 1;
       const showLevelFiveGuide = world.level === 5 && shotsRef.current < 2;
       const showLevelSixGuide = world.level === 6 && shotsRef.current < 2;
+      const showLevelSevenGuide = world.level === 7 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -447,9 +478,10 @@ export default function Home() {
         const isLevelFour = world.level === 4;
         const isLevelFive = world.level === 5;
         const isLevelSix = world.level === 6;
+        const isLevelSeven = world.level === 7;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -506,6 +538,16 @@ export default function Home() {
           );
           ctx.fillStyle = switchIsOn ? "#26334d" : "#59657c";
           ctx.fillText("② 右下へ長く → クッション", 180, 187);
+        } else if (isLevelSeven) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = world.gateOpen.every(Boolean) ? "#28794f" : "#873328";
+          ctx.fillText(
+            world.gateOpen.every(Boolean) ? "① ゲートOPEN！" : "① 箱をスイッチへ → ゲートOPEN",
+            180,
+            158,
+          );
+          ctx.fillStyle = world.gateOpen.every(Boolean) ? "#26334d" : "#59657c";
+          ctx.fillText("② 右下へ長く → 通り抜ける", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -613,7 +655,9 @@ export default function Home() {
                       ? "ネコを左へ長くドラッグし、反動で右のバネへ乗せます。バネで跳ね上がり、高い足場のクッションへ着地しましょう。"
                       : level === 5
                         ? "最初は左へ短くドラッグし、軽い風船だけを大きく動かします。次に右下へ長くドラッグし、空いたクッションへ戻りましょう。"
-                        : "最初は左へ長くドラッグし、箱を赤いスイッチまで運んでONにします。次に右下へ長くドラッグし、使えるようになったクッションへ戻りましょう。"
+                        : level === 6
+                          ? "最初は左へ長くドラッグし、箱を赤いスイッチまで運んでONにします。次に右下へ長くドラッグし、使えるようになったクッションへ戻りましょう。"
+                          : "箱を赤いスイッチへ運ぶとゲートが開きます。箱を載せたまま、右下へ長くドラッグして開いた通路を抜け、クッションへ戻りましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -652,7 +696,9 @@ export default function Home() {
                           ? "つぎは風船を飛ばそう"
                           : level === 5
                             ? "つぎはスイッチON"
-                            : "全レベル クリア！"}
+                            : level === 6
+                              ? "つぎはゲートを開けよう"
+                              : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (

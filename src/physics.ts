@@ -10,7 +10,7 @@ export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export type Obstacle = {
   x: number;
@@ -35,6 +35,10 @@ export type PressureSwitch = {
   width: number;
 };
 
+export type Gate = Obstacle & {
+  switchIndex: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -45,6 +49,7 @@ export type LevelDefinition = {
   iceZones: IceZone[];
   springs: SpringPad[];
   switches: PressureSwitch[];
+  gates: Gate[];
   hint: string;
 };
 
@@ -69,6 +74,8 @@ export type PhysicsState = {
   springArmed: boolean[];
   switches: PressureSwitch[];
   switchOn: boolean[];
+  gates: Gate[];
+  gateOpen: boolean[];
   goalHold: number;
 };
 
@@ -97,6 +104,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     iceZones: [],
     springs: [],
     switches: [],
+    gates: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -109,6 +117,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     iceZones: [],
     springs: [],
     switches: [],
+    gates: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
@@ -121,6 +130,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     iceZones: [{ x: 112, width: 213 }],
     springs: [],
     switches: [],
+    gates: [],
     hint: "氷の上はツルツル！",
   },
   4: {
@@ -133,6 +143,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     iceZones: [],
     springs: [{ x: 135, width: 65, launchVelocity: 760 }],
     switches: [],
+    gates: [],
     hint: "バネに乗って高い足場へ！",
   },
   5: {
@@ -145,6 +156,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     iceZones: [],
     springs: [],
     switches: [],
+    gates: [],
     hint: "弱い風で風船をどかそう！",
   },
   6: {
@@ -157,7 +169,21 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     iceZones: [],
     springs: [],
     switches: [{ x: 26, width: 65 }],
+    gates: [],
     hint: "箱を置いてスイッチON！",
+  },
+  7: {
+    id: 7,
+    cat: { x: 250, y: FLOOR_Y - CAT_R },
+    box: { x: 175, y: FLOOR_Y - BOX_HALF },
+    balloon: null,
+    goal: { left: 128, right: 166, top: 486, bottom: 522 },
+    obstacles: [],
+    iceZones: [],
+    springs: [],
+    switches: [{ x: 26, width: 65 }],
+    gates: [{ x: 207, y: 145, width: 14, height: 400, switchIndex: 0 }],
+    hint: "スイッチでゲートOPEN！",
   },
 };
 
@@ -167,6 +193,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 3) return 4;
   if (level === 4) return 5;
   if (level === 5) return 6;
+  if (level === 6) return 7;
   return null;
 }
 
@@ -184,6 +211,8 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     springArmed: definition.springs.map(() => true),
     switches: definition.switches.map((pressureSwitch) => ({ ...pressureSwitch })),
     switchOn: definition.switches.map(() => false),
+    gates: definition.gates.map((gate) => ({ ...gate })),
+    gateOpen: definition.gates.map(() => false),
     goalHold: 0,
   };
 }
@@ -430,6 +459,18 @@ function stepSwitches(world: PhysicsState) {
   ));
 }
 
+function stepGates(world: PhysicsState) {
+  world.gateOpen = world.gates.map(
+    (gate) => world.switchOn[gate.switchIndex] === true,
+  );
+
+  world.gates.forEach((gate, index) => {
+    if (world.gateOpen[index]) return;
+    resolveBodyObstacle(world.cat, CAT_R, gate);
+    if (world.box) resolveBodyObstacle(world.box, BOX_HALF, gate);
+  });
+}
+
 export function stepPhysics(world: PhysicsState, dt: number) {
   const bodies = world.box ? [world.cat, world.box] : [world.cat];
   for (const body of bodies) {
@@ -466,6 +507,7 @@ export function stepPhysics(world: PhysicsState, dt: number) {
 
   stepSprings(world);
   stepSwitches(world);
+  stepGates(world);
 
   const goalUnlocked = (
     (world.level !== 5 || world.balloonCleared) &&

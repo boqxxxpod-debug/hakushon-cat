@@ -50,6 +50,14 @@ test("level six explains how the box holds the pressure switch", () => {
   assert.match(appSource, /level === 5[\s\S]*箱を赤いスイッチまで運んでON[\s\S]*使えるようになったクッションへ戻りましょう/);
 });
 
+test("level seven explains how the pressure switch opens the gate", () => {
+  assert.match(appSource, /world\.level === 7 && shotsRef\.current < 2/);
+  assert.match(appSource, /① 箱をスイッチへ → ゲートOPEN/);
+  assert.match(appSource, /① ゲートOPEN！/);
+  assert.match(appSource, /② 右下へ長く → 通り抜ける/);
+  assert.match(appSource, /level === 6[\s\S]*箱を赤いスイッチへ運ぶとゲートが開きます[\s\S]*開いた通路を抜け/);
+});
+
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*全レベル クリア！/);
 });
