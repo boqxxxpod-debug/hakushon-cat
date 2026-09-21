@@ -8,7 +8,7 @@ export const BOX_HALF = 21;
 export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 
-export type LevelId = 1 | 2 | 3;
+export type LevelId = 1 | 2 | 3 | 4;
 
 export type Obstacle = {
   x: number;
@@ -82,11 +82,20 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     obstacles: [{ x: 155, y: FLOOR_Y - 30, width: 24, height: 30 }],
     hint: "右へ → 左下へ！",
   },
+  4: {
+    id: 4,
+    cat: { x: 250, y: FLOOR_Y - CAT_R },
+    box: { x: 175, y: FLOOR_Y - BOX_HALF },
+    goal: { left: 128, right: 166, top: 486, bottom: 522 },
+    obstacles: [],
+    hint: "箱を左へ → 右下へ！",
+  },
 };
 
 export function nextLevel(level: LevelId): LevelId | null {
   if (level === 1) return 2;
   if (level === 2) return 3;
+  if (level === 3) return 4;
   return null;
 }
 
@@ -124,6 +133,32 @@ export function sneezeVelocity(dirX: number, dirY: number, power: number) {
     vx: -dirX * (320 + 210 * power),
     vy: -dirY * (260 + 160 * power),
   };
+}
+
+export function applySneeze(
+  world: PhysicsState,
+  dirX: number,
+  dirY: number,
+  power: number,
+) {
+  const velocity = sneezeVelocity(dirX, dirY, power);
+  world.cat.vx += velocity.vx;
+  world.cat.vy += velocity.vy;
+
+  const box = world.box;
+  if (!box) return false;
+
+  const toBoxX = box.x - world.cat.x;
+  const toBoxY = box.y - world.cat.y;
+  const boxDistance = Math.hypot(toBoxX, toBoxY);
+  const coneDot = boxDistance > 0
+    ? (toBoxX * dirX + toBoxY * dirY) / boxDistance
+    : -1;
+  if (boxDistance >= 155 || coneDot <= 0.82) return false;
+
+  box.vx += dirX * (230 + 220 * power);
+  box.vy += dirY * (130 + 130 * power) - 50 * power;
+  return true;
 }
 
 function collideWithFloorAndWalls(
