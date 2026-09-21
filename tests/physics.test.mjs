@@ -187,20 +187,23 @@ test("level four uses its spring to reach the raised cushion", () => {
   assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
-test("level progression stops after level four and restart preserves the current level", () => {
+test("level progression reaches level six and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
   assert.equal(nextLevel(4), 5);
-  assert.equal(nextLevel(5), null);
+  assert.equal(nextLevel(5), 6);
+  assert.equal(nextLevel(6), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
   assert.deepEqual(freshPhysics(nextLevel(4)), freshPhysics(5));
+  assert.deepEqual(freshPhysics(nextLevel(5)), freshPhysics(6));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
   assert.deepEqual(freshPhysics(5), freshPhysics(5));
+  assert.deepEqual(freshPhysics(6), freshPhysics(6));
 });
 
 test("level five balloon responds farther than a box to the same wind", () => {
@@ -251,6 +254,55 @@ test("level five has a verified light-puff and return solution", () => {
   assert.ok(world.goalHold >= 0.6);
 });
 
+test("level six switch turns on only while the stopped box rests on it", () => {
+  const world = freshPhysics(6);
+
+  assert.deepEqual(world.switches, [{ x: 26, width: 65 }]);
+  assert.deepEqual(world.switchOn, [false]);
+
+  applySneeze(world, -1, 0, 1);
+  stepPhysics(world, 1 / 60);
+  assert.equal(world.switchOn[0], false, "a moving box must not press the switch yet");
+
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+  assert.equal(world.switchOn[0], true);
+
+  world.box.x = 175;
+  world.box.vx = 0;
+  world.box.vy = 0;
+  stepPhysics(world, 1 / 60);
+  assert.equal(world.switchOn[0], false, "the switch must release when the box leaves");
+});
+
+test("level six keeps the cushion locked until the switch is on", () => {
+  const world = freshPhysics(6);
+  world.cat = { x: 145, y: 520, vx: 0, vy: 0 };
+
+  for (let frame = 0; frame < 60; frame += 1) stepPhysics(world, 1 / 60);
+  assert.equal(world.goalHold, 0);
+
+  world.box.x = 50;
+  for (let frame = 0; frame < 60; frame += 1) stepPhysics(world, 1 / 60);
+  assert.equal(world.switchOn[0], true);
+  assert.ok(world.goalHold >= 0.6);
+});
+
+test("level six has a verified switch-and-return solution", () => {
+  const world = freshPhysics(6);
+  applySneeze(world, -1, 0, 1);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(world.switchOn[0], true);
+
+  const radians = (45 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.95);
+  for (let frame = 0; frame < 300 && world.goalHold < 0.6; frame += 1) {
+    stepPhysics(world, 1 / 60);
+  }
+
+  assert.ok(world.goalHold >= 0.6);
+});
+
 test("power is clamped between minimum and maximum", () => {
   assert.equal(powerForDistance(0), 0.25);
   assert.equal(powerForDistance(MAX_AIM_DISTANCE / 2), 0.5);
@@ -279,5 +331,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.ok(LEVELS[3].goal.right <= LEVELS[3].iceZones[0].x);
   assert.equal(isRestingOnCushion({ x: 280, y: 380, vx: 2, vy: 1 }, 4), true);
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 5), true);
+  assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 6), true);
   assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });

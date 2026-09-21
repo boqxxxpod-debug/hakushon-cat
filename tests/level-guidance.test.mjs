@@ -42,6 +42,14 @@ test("level five explains the balloon's strong wind response", () => {
   assert.match(appSource, /level === 4[\s\S]*軽い風船だけを大きく動かします[\s\S]*空いたクッションへ戻りましょう/);
 });
 
+test("level six explains how the box holds the pressure switch", () => {
+  assert.match(appSource, /world\.level === 6 && shotsRef\.current < 2/);
+  assert.match(appSource, /① 左へ長く → 箱をスイッチへ/);
+  assert.match(appSource, /① スイッチON！/);
+  assert.match(appSource, /② 右下へ長く → クッション/);
+  assert.match(appSource, /level === 5[\s\S]*箱を赤いスイッチまで運んでON[\s\S]*使えるようになったクッションへ戻りましょう/);
+});
+
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*全レベル クリア！/);
 });
