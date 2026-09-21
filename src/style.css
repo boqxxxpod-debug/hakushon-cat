@@ -153,6 +153,45 @@ button { font: inherit; }
   box-shadow: none;
 }
 
+.rope-release-button {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: clamp(16px, 5vw, 22px);
+  min-width: 178px;
+  min-height: 50px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transform: translateX(-50%);
+  border: 3px solid #26334d;
+  border-radius: 999px;
+  background: #f6bc32;
+  padding: 8px 18px;
+  color: #26334d;
+  font-size: 15px;
+  font-weight: 950;
+  line-height: 1;
+  box-shadow: 4px 4px 0 #26334d;
+  cursor: pointer;
+}
+
+.rope-release-button span {
+  font-size: 20px;
+  line-height: .8;
+}
+
+.rope-release-button:focus-visible {
+  outline: 4px solid #2aa8ef;
+  outline-offset: 3px;
+}
+
+.rope-release-button:active {
+  transform: translate(calc(-50% + 3px), 3px);
+  box-shadow: 1px 1px 0 #26334d;
+}
+
 .status-live {
   position: absolute;
   width: 1px;
@@ -317,5 +356,5 @@ button { font: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .restart-button, .stage-restart-button, .win-primary-button { transition: none; }
+  .restart-button, .stage-restart-button, .rope-release-button, .win-primary-button { transition: none; }
 }
