@@ -5,11 +5,12 @@ export const LEFT_WALL = 18;
 export const RIGHT_WALL = 342;
 export const CAT_R = 25;
 export const BOX_HALF = 21;
+export const BALLOON_R = 18;
 export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 
-export type LevelId = 1 | 2 | 3 | 4;
+export type LevelId = 1 | 2 | 3 | 4 | 5;
 
 export type Obstacle = {
   x: number;
@@ -33,6 +34,7 @@ export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
   box: Pick<Body, "x" | "y"> | null;
+  balloon: Pick<Body, "x" | "y"> | null;
   goal: { left: number; right: number; top: number; bottom: number };
   obstacles: Obstacle[];
   iceZones: IceZone[];
@@ -53,6 +55,8 @@ export type PhysicsState = {
   level: LevelId;
   cat: Body;
   box: Body | null;
+  balloon: Body | null;
+  balloonCleared: boolean;
   obstacles: Obstacle[];
   iceZones: IceZone[];
   springs: SpringPad[];
@@ -79,6 +83,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     id: 1,
     cat: { x: 285, y: FLOOR_Y - CAT_R },
     box: null,
+    balloon: null,
     goal: { left: 48, right: 148, top: 486, bottom: 522 },
     obstacles: [],
     iceZones: [],
@@ -89,6 +94,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     id: 2,
     cat: { x: 250, y: FLOOR_Y - CAT_R },
     box: { x: 175, y: FLOOR_Y - BOX_HALF },
+    balloon: null,
     goal: { left: 128, right: 166, top: 486, bottom: 522 },
     obstacles: [],
     iceZones: [],
@@ -99,6 +105,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     id: 3,
     cat: { x: 285, y: FLOOR_Y - CAT_R },
     box: null,
+    balloon: null,
     goal: { left: 48, right: 112, top: 486, bottom: 522 },
     obstacles: [],
     iceZones: [{ x: 112, width: 213 }],
@@ -109,11 +116,23 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     id: 4,
     cat: { x: 70, y: FLOOR_Y - CAT_R },
     box: null,
+    balloon: null,
     goal: { left: 238, right: 326, top: 350, bottom: 382 },
     obstacles: [{ x: 220, y: 405, width: 112, height: 140 }],
     iceZones: [],
     springs: [{ x: 135, width: 65, launchVelocity: 760 }],
     hint: "バネに乗って高い足場へ！",
+  },
+  5: {
+    id: 5,
+    cat: { x: 250, y: FLOOR_Y - CAT_R },
+    box: null,
+    balloon: { x: 175, y: FLOOR_Y - BALLOON_R - 2 },
+    goal: { left: 120, right: 166, top: 486, bottom: 522 },
+    obstacles: [],
+    iceZones: [],
+    springs: [],
+    hint: "弱い風で風船をどかそう！",
   },
 };
 
@@ -121,6 +140,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 1) return 2;
   if (level === 2) return 3;
   if (level === 3) return 4;
+  if (level === 4) return 5;
   return null;
 }
 
@@ -130,6 +150,8 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     level,
     cat: { ...definition.cat, vx: 0, vy: 0 },
     box: definition.box ? { ...definition.box, vx: 0, vy: 0 } : null,
+    balloon: definition.balloon ? { ...definition.balloon, vx: 0, vy: 0 } : null,
+    balloonCleared: false,
     obstacles: definition.obstacles.map((obstacle) => ({ ...obstacle })),
     iceZones: definition.iceZones.map((zone) => ({ ...zone })),
     springs: definition.springs.map((spring) => ({ ...spring })),
@@ -177,20 +199,38 @@ export function applySneeze(
   world.cat.vx += velocity.vx;
   world.cat.vy += velocity.vy;
 
+  let movedObject = false;
   const box = world.box;
-  if (!box) return false;
+  if (box) {
+    const toBoxX = box.x - world.cat.x;
+    const toBoxY = box.y - world.cat.y;
+    const boxDistance = Math.hypot(toBoxX, toBoxY);
+    const coneDot = boxDistance > 0
+      ? (toBoxX * dirX + toBoxY * dirY) / boxDistance
+      : -1;
+    if (boxDistance < 155 && coneDot > 0.82) {
+      box.vx += dirX * (230 + 220 * power);
+      box.vy += dirY * (130 + 130 * power) - 50 * power;
+      movedObject = true;
+    }
+  }
 
-  const toBoxX = box.x - world.cat.x;
-  const toBoxY = box.y - world.cat.y;
-  const boxDistance = Math.hypot(toBoxX, toBoxY);
-  const coneDot = boxDistance > 0
-    ? (toBoxX * dirX + toBoxY * dirY) / boxDistance
-    : -1;
-  if (boxDistance >= 155 || coneDot <= 0.82) return false;
+  const balloon = world.balloon;
+  if (balloon) {
+    const toBalloonX = balloon.x - world.cat.x;
+    const toBalloonY = balloon.y - world.cat.y;
+    const balloonDistance = Math.hypot(toBalloonX, toBalloonY);
+    const coneDot = balloonDistance > 0
+      ? (toBalloonX * dirX + toBalloonY * dirY) / balloonDistance
+      : -1;
+    if (balloonDistance < 180 && coneDot > 0.76) {
+      balloon.vx += dirX * (430 + 520 * power);
+      balloon.vy += dirY * (330 + 420 * power) - 120 * power;
+      movedObject = true;
+    }
+  }
 
-  box.vx += dirX * (230 + 220 * power);
-  box.vy += dirY * (130 + 130 * power) - 50 * power;
-  return true;
+  return movedObject;
 }
 
 function collideWithFloorAndWalls(
@@ -247,6 +287,63 @@ function resolveCatBox(world: PhysicsState) {
     box.vx -= nx * impulse * 0.85;
     box.vy -= ny * impulse * 0.85;
   }
+}
+
+function resolveCatBalloon(world: PhysicsState) {
+  const balloon = world.balloon;
+  if (!balloon) return;
+  const dx = world.cat.x - balloon.x;
+  const dy = world.cat.y - balloon.y;
+  const minDistance = CAT_R + BALLOON_R;
+  const distance = Math.hypot(dx, dy);
+  if (distance >= minDistance || distance < 0.001) return;
+  const nx = dx / distance;
+  const ny = dy / distance;
+  const overlap = minDistance - distance;
+  world.cat.x += nx * overlap * 0.2;
+  world.cat.y += ny * overlap * 0.2;
+  balloon.x -= nx * overlap * 0.8;
+  balloon.y -= ny * overlap * 0.8;
+  const relative = (world.cat.vx - balloon.vx) * nx + (world.cat.vy - balloon.vy) * ny;
+  if (relative < 0) {
+    const impulse = -relative * 0.45;
+    world.cat.vx += nx * impulse * 0.25;
+    world.cat.vy += ny * impulse * 0.25;
+    balloon.vx -= nx * impulse * 1.5;
+    balloon.vy -= ny * impulse * 1.5;
+  }
+}
+
+function stepBalloon(world: PhysicsState, dt: number) {
+  const balloon = world.balloon;
+  if (!balloon) return;
+  balloon.vy -= 26 * dt;
+  balloon.vx *= Math.pow(0.97, dt * 60);
+  balloon.vy *= Math.pow(0.985, dt * 60);
+  balloon.x += balloon.vx * dt;
+  balloon.y += balloon.vy * dt;
+
+  const minX = LEFT_WALL + BALLOON_R;
+  const maxX = RIGHT_WALL - BALLOON_R;
+  const minY = 145 + BALLOON_R;
+  const maxY = FLOOR_Y - BALLOON_R;
+  if (balloon.x < minX) {
+    balloon.x = minX;
+    if (balloon.vx < 0) balloon.vx *= -0.28;
+  }
+  if (balloon.x > maxX) {
+    balloon.x = maxX;
+    if (balloon.vx > 0) balloon.vx *= -0.28;
+  }
+  if (balloon.y < minY) {
+    balloon.y = minY;
+    if (balloon.vy < 0) balloon.vy *= -0.2;
+  }
+  if (balloon.y > maxY) {
+    balloon.y = maxY;
+    if (balloon.vy > 0) balloon.vy *= -0.2;
+  }
+  if (balloon.x <= 100) world.balloonCleared = true;
 }
 
 function resolveBodyObstacle(body: Body, radius: number, obstacle: Obstacle) {
@@ -318,6 +415,8 @@ export function stepPhysics(world: PhysicsState, dt: number) {
     collideWithFloorAndWalls(world.box, BOX_HALF, 520, dt);
     resolveCatBox(world);
   }
+  stepBalloon(world, dt);
+  resolveCatBalloon(world);
 
   let catOnPlatform = false;
   for (const obstacle of world.obstacles) {
@@ -328,7 +427,8 @@ export function stepPhysics(world: PhysicsState, dt: number) {
 
   stepSprings(world);
 
-  const restingOnCushion = isRestingOnCushion(world.cat, world.level);
+  const goalUnlocked = world.level !== 5 || world.balloonCleared;
+  const restingOnCushion = goalUnlocked && isRestingOnCushion(world.cat, world.level);
   world.goalHold = restingOnCushion ? world.goalHold + dt : 0;
 }
 
