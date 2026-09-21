@@ -7,6 +7,7 @@ export const CAT_R = 25;
 export const BOX_HALF = 21;
 export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
+export const CAT_ICE_FRICTION = 90;
 
 export type LevelId = 1 | 2 | 3 | 4;
 
@@ -17,12 +18,18 @@ export type Obstacle = {
   height: number;
 };
 
+export type IceZone = {
+  x: number;
+  width: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
   box: Pick<Body, "x" | "y"> | null;
   goal: { left: number; right: number; top: number; bottom: number };
   obstacles: Obstacle[];
+  iceZones: IceZone[];
   hint: string;
 };
 
@@ -40,6 +47,7 @@ export type PhysicsState = {
   cat: Body;
   box: Body | null;
   obstacles: Obstacle[];
+  iceZones: IceZone[];
   goalHold: number;
 };
 
@@ -64,6 +72,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     box: null,
     goal: { left: 48, right: 148, top: 486, bottom: 522 },
     obstacles: [],
+    iceZones: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -72,15 +81,17 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     box: { x: 175, y: FLOOR_Y - BOX_HALF },
     goal: { left: 128, right: 166, top: 486, bottom: 522 },
     obstacles: [],
+    iceZones: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
     id: 3,
-    cat: { x: 120, y: FLOOR_Y - CAT_R },
+    cat: { x: 285, y: FLOOR_Y - CAT_R },
     box: null,
-    goal: { left: 200, right: 333, top: 486, bottom: 522 },
-    obstacles: [{ x: 155, y: FLOOR_Y - 30, width: 24, height: 30 }],
-    hint: "右へ → 左下へ！",
+    goal: { left: 48, right: 112, top: 486, bottom: 522 },
+    obstacles: [],
+    iceZones: [{ x: 112, width: 213 }],
+    hint: "氷の上はツルツル！",
   },
   4: {
     id: 4,
@@ -88,6 +99,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     box: { x: 175, y: FLOOR_Y - BOX_HALF },
     goal: { left: 128, right: 166, top: 486, bottom: 522 },
     obstacles: [],
+    iceZones: [],
     hint: "箱を左へ → 右下へ！",
   },
 };
@@ -106,6 +118,7 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     cat: { ...definition.cat, vx: 0, vy: 0 },
     box: definition.box ? { ...definition.box, vx: 0, vy: 0 } : null,
     obstacles: definition.obstacles.map((obstacle) => ({ ...obstacle })),
+    iceZones: definition.iceZones.map((zone) => ({ ...zone })),
     goalHold: 0,
   };
 }
@@ -122,6 +135,10 @@ export function approach(value: number, target: number, amount: number) {
 
 export function applyGroundFriction(velocityX: number, dt: number) {
   return approach(velocityX, 0, CAT_GROUND_FRICTION * dt);
+}
+
+export function applyIceFriction(velocityX: number, dt: number) {
+  return approach(velocityX, 0, CAT_ICE_FRICTION * dt);
 }
 
 export function powerForDistance(distance: number) {
@@ -255,7 +272,12 @@ export function stepPhysics(world: PhysicsState, dt: number) {
 
   collideWithFloorAndWalls(world.cat, CAT_R, 0, dt);
   if (world.cat.y >= FLOOR_Y - CAT_R - 0.5) {
-    world.cat.vx = applyGroundFriction(world.cat.vx, dt);
+    const onIce = world.iceZones.some(
+      (zone) => world.cat.x >= zone.x && world.cat.x <= zone.x + zone.width,
+    );
+    world.cat.vx = onIce
+      ? applyIceFriction(world.cat.vx, dt)
+      : applyGroundFriction(world.cat.vx, dt);
   }
 
   if (world.box) {

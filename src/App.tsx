@@ -242,6 +242,23 @@ export default function Home() {
       ctx.fillStyle = "rgba(100, 67, 42, .15)";
       for (let x = 38; x < RIGHT_WALL; x += 64) ctx.fillRect(x, FLOOR_Y + 16, 2, 28);
 
+      for (const zone of definition.iceZones) {
+        const iceGradient = ctx.createLinearGradient(zone.x, 0, zone.x + zone.width, 0);
+        iceGradient.addColorStop(0, "#bcefff");
+        iceGradient.addColorStop(0.5, "#e8fbff");
+        iceGradient.addColorStop(1, "#91d9f3");
+        ctx.fillStyle = iceGradient;
+        roundedRect(ctx, zone.x, FLOOR_Y - 8, zone.width, 17, 7);
+        ctx.fill();
+        ctx.strokeStyle = "#53b8dc";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.76)";
+        for (let x = zone.x + 18; x < zone.x + zone.width - 8; x += 42) {
+          ctx.fillRect(x, FLOOR_Y - 4, 18, 2);
+        }
+      }
+
       ctx.save();
       ctx.shadowColor = "rgba(52, 110, 80, .2)";
       ctx.shadowBlur = 10;
@@ -337,7 +354,7 @@ export default function Home() {
 
       const showLevelOneGuide = world.level === 1 && shotsRef.current < 2;
       const showLevelTwoGuide = world.level === 2 && shotsRef.current < 2;
-      const showLevelThreeGuide = world.level === 3 && shotsRef.current < 2;
+      const showLevelThreeGuide = world.level === 3 && shotsRef.current < 1;
       const showLevelFourGuide = world.level === 4 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
@@ -348,7 +365,6 @@ export default function Home() {
         const isLevelTwo = world.level === 2;
         const isLevelThree = world.level === 3;
         const isLevelFour = world.level === 4;
-        const reachedLeftWall = world.cat.x <= LEFT_WALL + CAT_R + 8;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
@@ -377,14 +393,10 @@ export default function Home() {
           ctx.fillText("② 右下へ長くドラッグ → ゴール", 180, 187);
         } else if (isLevelThree) {
           ctx.font = "800 15px system-ui, sans-serif";
-          ctx.fillStyle = reachedLeftWall ? "#28794f" : "#26334d";
-          ctx.fillText(
-            reachedLeftWall ? "① 左壁まで移動できた！" : "① 右へ長くドラッグ → 左壁へ",
-            180,
-            158,
-          );
-          ctx.fillStyle = reachedLeftWall ? "#26334d" : "#59657c";
-          ctx.fillText("② 左下へ長くドラッグ → 壁越え", 180, 187);
+          ctx.fillStyle = "#2685a7";
+          ctx.fillText("氷の上は止まりにくい！", 180, 158);
+          ctx.fillStyle = "#26334d";
+          ctx.fillText("右へ長くドラッグ → 左へ滑る", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -487,7 +499,7 @@ export default function Home() {
                 : level === 2
                   ? "最初はネコを左へ長くドラッグし、風で箱を左へ押しながら反動で右へ移動します。次に右下へ長くドラッグし、箱が空けたクッションへ戻ります。"
                   : level === 3
-                    ? "最初はネコを右へ長くドラッグして左壁まで移動します。次に左下へ長くドラッグし、反動で中央の壁を越えます。"
+                    ? "氷の上ではネコが長く滑ります。ネコを右へ長くドラッグし、反動で左へ滑って氷の先のクッションで止まりましょう。"
                     : "最初はネコを左へ長くドラッグし、風で箱を左へ押しながら反動で右へ移動します。次に右下へ長くドラッグし、箱が空けたクッションへ戻ります。"
             }
             onPointerDown={handlePointerDown}
@@ -520,7 +532,7 @@ export default function Home() {
                   {level === 1
                     ? "つぎは箱をどかそう"
                     : level === 2
-                      ? "つぎは壁で向きを変えよう"
+                      ? "つぎは氷で滑ろう"
                       : level === 3
                         ? "つぎは箱をどけよう"
                         : "全レベル クリア！"}
