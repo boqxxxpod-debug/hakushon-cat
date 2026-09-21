@@ -10,7 +10,7 @@ export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type Obstacle = {
   x: number;
@@ -39,6 +39,15 @@ export type Gate = Obstacle & {
   switchIndex: number;
 };
 
+export type Seesaw = {
+  x: number;
+  y: number;
+  width: number;
+  thickness: number;
+  maxAngle: number;
+  angularSpeed: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -50,6 +59,7 @@ export type LevelDefinition = {
   springs: SpringPad[];
   switches: PressureSwitch[];
   gates: Gate[];
+  seesaws: Seesaw[];
   hint: string;
 };
 
@@ -76,6 +86,8 @@ export type PhysicsState = {
   switchOn: boolean[];
   gates: Gate[];
   gateOpen: boolean[];
+  seesaws: Seesaw[];
+  seesawAngles: number[];
   goalHold: number;
 };
 
@@ -105,6 +117,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     springs: [],
     switches: [],
     gates: [],
+    seesaws: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -118,6 +131,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     springs: [],
     switches: [],
     gates: [],
+    seesaws: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
@@ -131,6 +145,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     springs: [],
     switches: [],
     gates: [],
+    seesaws: [],
     hint: "氷の上はツルツル！",
   },
   4: {
@@ -144,6 +159,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     springs: [{ x: 135, width: 65, launchVelocity: 760 }],
     switches: [],
     gates: [],
+    seesaws: [],
     hint: "バネに乗って高い足場へ！",
   },
   5: {
@@ -157,6 +173,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     springs: [],
     switches: [],
     gates: [],
+    seesaws: [],
     hint: "弱い風で風船をどかそう！",
   },
   6: {
@@ -170,6 +187,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     springs: [],
     switches: [{ x: 26, width: 65 }],
     gates: [],
+    seesaws: [],
     hint: "箱を置いてスイッチON！",
   },
   7: {
@@ -183,7 +201,29 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     springs: [],
     switches: [{ x: 26, width: 65 }],
     gates: [{ x: 207, y: 145, width: 14, height: 400, switchIndex: 0 }],
+    seesaws: [],
     hint: "スイッチでゲートOPEN！",
+  },
+  8: {
+    id: 8,
+    cat: { x: 317, y: FLOOR_Y - CAT_R },
+    box: { x: 180, y: 461 },
+    balloon: null,
+    goal: { left: 250, right: 326, top: 395, bottom: 450 },
+    obstacles: [],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [{
+      x: 170,
+      y: 490,
+      width: 260,
+      thickness: 16,
+      maxAngle: 0.25,
+      angularSpeed: 1.8,
+    }],
+    hint: "箱でシーソーを傾けよう！",
   },
 };
 
@@ -194,6 +234,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 4) return 5;
   if (level === 5) return 6;
   if (level === 6) return 7;
+  if (level === 7) return 8;
   return null;
 }
 
@@ -213,6 +254,8 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     switchOn: definition.switches.map(() => false),
     gates: definition.gates.map((gate) => ({ ...gate })),
     gateOpen: definition.gates.map(() => false),
+    seesaws: definition.seesaws.map((seesaw) => ({ ...seesaw })),
+    seesawAngles: definition.seesaws.map(() => 0),
     goalHold: 0,
   };
 }
@@ -471,6 +514,99 @@ function stepGates(world: PhysicsState) {
   });
 }
 
+function seesawLocalPosition(body: Body, seesaw: Seesaw, angle: number) {
+  const dx = body.x - seesaw.x;
+  const dy = body.y - seesaw.y;
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  return {
+    x: dx * cosine + dy * sine,
+    y: -dx * sine + dy * cosine,
+  };
+}
+
+function isLoadingSeesaw(
+  body: Body,
+  radius: number,
+  seesaw: Seesaw,
+  angle: number,
+) {
+  const local = seesawLocalPosition(body, seesaw, angle);
+  const surfaceY = -seesaw.thickness / 2;
+  return (
+    Math.abs(local.x) <= seesaw.width / 2 + radius * 0.65 &&
+    local.y >= surfaceY - radius - 14 &&
+    local.y <= surfaceY + radius + 12
+  );
+}
+
+function resolveBodySeesaw(
+  body: Body,
+  radius: number,
+  seesaw: Seesaw,
+  angle: number,
+  friction: number,
+  dt: number,
+) {
+  const local = seesawLocalPosition(body, seesaw, angle);
+  const surfaceY = -seesaw.thickness / 2;
+  if (
+    Math.abs(local.x) > seesaw.width / 2 + radius * 0.35 ||
+    local.y + radius <= surfaceY ||
+    local.y > surfaceY + radius + 16
+  ) return false;
+
+  const correctedY = surfaceY - radius;
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  body.x = seesaw.x + local.x * cosine - correctedY * sine;
+  body.y = seesaw.y + local.x * sine + correctedY * cosine;
+
+  const normalX = sine;
+  const normalY = -cosine;
+  const intoSurface = body.vx * normalX + body.vy * normalY;
+  if (intoSurface < 0) {
+    body.vx -= intoSurface * normalX * 1.08;
+    body.vy -= intoSurface * normalY * 1.08;
+  }
+  const tangentX = cosine;
+  const tangentY = sine;
+  const tangentSpeed = body.vx * tangentX + body.vy * tangentY;
+  const slowedTangent = approach(tangentSpeed, 0, friction * dt);
+  const tangentReduction = tangentSpeed - slowedTangent;
+  body.vx -= tangentX * tangentReduction;
+  body.vy -= tangentY * tangentReduction;
+  return true;
+}
+
+function stepSeesaws(world: PhysicsState, dt: number) {
+  world.seesaws.forEach((seesaw, index) => {
+    const currentAngle = world.seesawAngles[index];
+    let loadMoment = 0;
+    if (isLoadingSeesaw(world.cat, CAT_R, seesaw, currentAngle)) {
+      const local = seesawLocalPosition(world.cat, seesaw, currentAngle);
+      loadMoment += local.x / (seesaw.width / 2);
+    }
+    if (world.box && isLoadingSeesaw(world.box, BOX_HALF, seesaw, currentAngle)) {
+      const local = seesawLocalPosition(world.box, seesaw, currentAngle);
+      loadMoment += (local.x / (seesaw.width / 2)) * 2;
+    }
+
+    const targetAngle = clamp(loadMoment, -1, 1) * seesaw.maxAngle;
+    const angle = approach(currentAngle, targetAngle, seesaw.angularSpeed * dt);
+    world.seesawAngles[index] = angle;
+    resolveBodySeesaw(world.cat, CAT_R, seesaw, angle, 520, dt);
+    if (world.box) resolveBodySeesaw(world.box, BOX_HALF, seesaw, angle, 80, dt);
+  });
+}
+
+export function isSeesawReady(world: PhysicsState) {
+  if (world.level !== 8) return true;
+  const seesaw = world.seesaws[0];
+  const angle = world.seesawAngles[0] ?? 0;
+  return world.box !== null && angle <= -0.12 && world.box.x <= seesaw.x - 35;
+}
+
 export function stepPhysics(world: PhysicsState, dt: number) {
   const bodies = world.box ? [world.cat, world.box] : [world.cat];
   for (const body of bodies) {
@@ -508,10 +644,12 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   stepSprings(world);
   stepSwitches(world);
   stepGates(world);
+  stepSeesaws(world, dt);
 
   const goalUnlocked = (
     (world.level !== 5 || world.balloonCleared) &&
-    (world.level !== 6 || world.switchOn.every(Boolean))
+    (world.level !== 6 || world.switchOn.every(Boolean)) &&
+    isSeesawReady(world)
   );
   const restingOnCushion = goalUnlocked && isRestingOnCushion(world.cat, world.level);
   world.goalHold = restingOnCushion ? world.goalHold + dt : 0;

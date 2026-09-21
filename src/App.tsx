@@ -14,6 +14,7 @@ import {
   applySneeze,
   clamp,
   freshPhysics,
+  isSeesawReady,
   nextLevel,
   powerForDistance,
   stepPhysics,
@@ -214,7 +215,8 @@ export default function Home() {
       const definition = LEVELS[world.level];
       const goalLocked = (
         (world.level === 5 && !world.balloonCleared) ||
-        (world.level === 6 && !world.switchOn.every(Boolean))
+        (world.level === 6 && !world.switchOn.every(Boolean)) ||
+        (world.level === 8 && !isSeesawReady(world))
       );
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
@@ -281,6 +283,50 @@ export default function Home() {
           ctx.lineTo(x + 5, springY + (compressed ? 8 : 16));
         }
         ctx.stroke();
+      });
+
+      world.seesaws.forEach((seesaw, index) => {
+        const angle = world.seesawAngles[index];
+        ctx.fillStyle = "#8b6a48";
+        ctx.beginPath();
+        ctx.moveTo(seesaw.x, seesaw.y + 2);
+        ctx.lineTo(seesaw.x - 24, seesaw.y + 45);
+        ctx.lineTo(seesaw.x + 24, seesaw.y + 45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#533b29";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(seesaw.x, seesaw.y);
+        ctx.rotate(angle);
+        ctx.shadowColor = "rgba(75, 48, 30, .28)";
+        ctx.shadowBlur = 8;
+        roundedRect(
+          ctx,
+          -seesaw.width / 2,
+          -seesaw.thickness / 2,
+          seesaw.width,
+          seesaw.thickness,
+          7,
+        );
+        ctx.fillStyle = "#e0a454";
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "#82502a";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.48)";
+        for (let x = -seesaw.width / 2 + 18; x < seesaw.width / 2; x += 38) {
+          ctx.fillRect(x, -3, 20, 3);
+        }
+        ctx.restore();
+
+        ctx.fillStyle = "#533b29";
+        ctx.beginPath();
+        ctx.arc(seesaw.x, seesaw.y, 8, 0, Math.PI * 2);
+        ctx.fill();
       });
 
       world.switches.forEach((pressureSwitch, index) => {
@@ -351,7 +397,9 @@ export default function Home() {
       ctx.font = "800 11px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
-        goalLocked ? (world.level === 6 ? "スイッチ待ち" : "ふうせん待ち") : "おひるね",
+        goalLocked
+          ? (world.level === 6 ? "スイッチ待ち" : world.level === 8 ? "かたむき待ち" : "ふうせん待ち")
+          : "おひるね",
         goalX + goalWidth / 2,
         goalY + 16,
       );
@@ -467,10 +515,11 @@ export default function Home() {
       const showLevelFiveGuide = world.level === 5 && shotsRef.current < 2;
       const showLevelSixGuide = world.level === 6 && shotsRef.current < 2;
       const showLevelSevenGuide = world.level === 7 && shotsRef.current < 2;
+      const showLevelEightGuide = world.level === 8 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -479,9 +528,10 @@ export default function Home() {
         const isLevelFive = world.level === 5;
         const isLevelSix = world.level === 6;
         const isLevelSeven = world.level === 7;
+        const isLevelEight = world.level === 8;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -548,6 +598,17 @@ export default function Home() {
           );
           ctx.fillStyle = world.gateOpen.every(Boolean) ? "#26334d" : "#59657c";
           ctx.fillText("② 右下へ長く → 通り抜ける", 180, 187);
+        } else if (isLevelEight) {
+          const seesawReady = isSeesawReady(world);
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = seesawReady ? "#28794f" : "#82502a";
+          ctx.fillText(
+            seesawReady ? "① 右側が上がった！" : "① 左へ長く → 箱を左側へ",
+            180,
+            158,
+          );
+          ctx.fillStyle = seesawReady ? "#26334d" : "#59657c";
+          ctx.fillText("② 右下へ短く → 高いクッション", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -657,7 +718,9 @@ export default function Home() {
                         ? "最初は左へ短くドラッグし、軽い風船だけを大きく動かします。次に右下へ長くドラッグし、空いたクッションへ戻りましょう。"
                         : level === 6
                           ? "最初は左へ長くドラッグし、箱を赤いスイッチまで運んでONにします。次に右下へ長くドラッグし、使えるようになったクッションへ戻りましょう。"
-                          : "箱を赤いスイッチへ運ぶとゲートが開きます。箱を載せたまま、右下へ長くドラッグして開いた通路を抜け、クッションへ戻りましょう。"
+                          : level === 7
+                            ? "箱を赤いスイッチへ運ぶとゲートが開きます。箱を載せたまま、右下へ長くドラッグして開いた通路を抜け、クッションへ戻りましょう。"
+                            : "箱をシーソーの左側へ動かすと、反対側が高く上がります。右下へ短くドラッグし、高くなった右側のクッションへ着地しましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -698,7 +761,9 @@ export default function Home() {
                             ? "つぎはスイッチON"
                             : level === 6
                               ? "つぎはゲートを開けよう"
-                              : "全レベル クリア！"}
+                              : level === 7
+                                ? "つぎはシーソーで登ろう"
+                                : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (

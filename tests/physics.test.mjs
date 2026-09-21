@@ -13,6 +13,7 @@ import {
   applyGroundFriction,
   applyIceFriction,
   freshPhysics,
+  isSeesawReady,
   isRestingOnCushion,
   nextLevel,
   powerForDistance,
@@ -187,26 +188,29 @@ test("level four uses its spring to reach the raised cushion", () => {
   assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
-test("level progression reaches level seven and restart preserves the current level", () => {
+test("level progression reaches level eight and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
   assert.equal(nextLevel(4), 5);
   assert.equal(nextLevel(5), 6);
   assert.equal(nextLevel(6), 7);
-  assert.equal(nextLevel(7), null);
+  assert.equal(nextLevel(7), 8);
+  assert.equal(nextLevel(8), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
   assert.deepEqual(freshPhysics(nextLevel(4)), freshPhysics(5));
   assert.deepEqual(freshPhysics(nextLevel(5)), freshPhysics(6));
   assert.deepEqual(freshPhysics(nextLevel(6)), freshPhysics(7));
+  assert.deepEqual(freshPhysics(nextLevel(7)), freshPhysics(8));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
   assert.deepEqual(freshPhysics(5), freshPhysics(5));
   assert.deepEqual(freshPhysics(6), freshPhysics(6));
   assert.deepEqual(freshPhysics(7), freshPhysics(7));
+  assert.deepEqual(freshPhysics(8), freshPhysics(8));
 });
 
 test("level five balloon responds farther than a box to the same wind", () => {
@@ -361,6 +365,75 @@ test("level seven has a verified open-gate-and-return solution", () => {
   assert.equal(world.gateOpen[0], true);
 });
 
+test("level eight seesaw angle follows load position smoothly within its limit", () => {
+  const left = freshPhysics(8);
+  const right = freshPhysics(8);
+  left.box.x = 80;
+  right.box.x = 260;
+
+  stepPhysics(left, 1 / 60);
+  stepPhysics(right, 1 / 60);
+  assert.ok(left.seesawAngles[0] < 0);
+  assert.ok(right.seesawAngles[0] > 0);
+  assert.ok(Math.abs(left.seesawAngles[0]) <= 0.03 + Number.EPSILON);
+  assert.ok(Math.abs(right.seesawAngles[0]) <= 0.03 + Number.EPSILON);
+
+  for (let frame = 0; frame < 60; frame += 1) {
+    stepPhysics(left, 1 / 60);
+    stepPhysics(right, 1 / 60);
+  }
+  assert.ok(left.seesawAngles[0] >= -left.seesaws[0].maxAngle);
+  assert.ok(right.seesawAngles[0] <= right.seesaws[0].maxAngle);
+  assert.ok(left.seesawAngles[0] < -0.12);
+  assert.ok(right.seesawAngles[0] > 0.12);
+
+  left.box = null;
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(left, 1 / 60);
+  assert.ok(Math.abs(left.seesawAngles[0]) < 0.001, "an unloaded seesaw should return to center");
+});
+
+test("level eight seesaw supports both cat and box on its surface", () => {
+  const world = freshPhysics(8);
+  world.box = null;
+  world.cat = { x: 170, y: 350, vx: 0, vy: 0 };
+
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+  assert.ok(Math.abs(world.cat.y - 457) < 0.5);
+  assert.ok(Math.abs(world.cat.vy) < 10);
+
+  const boxWorld = freshPhysics(8);
+  for (let frame = 0; frame < 30; frame += 1) stepPhysics(boxWorld, 1 / 60);
+  assert.ok(boxWorld.box.y < FLOOR_Y - BOX_HALF - 20);
+});
+
+test("level eight requires the box on the low side before the raised goal works", () => {
+  const world = freshPhysics(8);
+  const radians = (80 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.35);
+  for (let frame = 0; frame < 300; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(isSeesawReady(world), false);
+  assert.equal(world.goalHold, 0);
+});
+
+test("level eight has a verified counterweight-and-landing solution", () => {
+  const world = freshPhysics(8);
+  applySneeze(world, -1, 0, 1);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(isSeesawReady(world), true);
+  assert.ok(world.seesawAngles[0] <= -0.12);
+
+  const radians = (80 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.35);
+  for (let frame = 0; frame < 300 && world.goalHold < 0.6; frame += 1) {
+    stepPhysics(world, 1 / 60);
+  }
+
+  assert.ok(world.goalHold >= 0.6);
+  assert.ok(world.cat.y < FLOOR_Y - CAT_R - 50);
+});
+
 test("power is clamped between minimum and maximum", () => {
   assert.equal(powerForDistance(0), 0.25);
   assert.equal(powerForDistance(MAX_AIM_DISTANCE / 2), 0.5);
@@ -391,5 +464,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 5), true);
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 6), true);
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 7), true);
+  assert.equal(isRestingOnCushion({ x: 280, y: 425, vx: 2, vy: 1 }, 8), true);
   assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });

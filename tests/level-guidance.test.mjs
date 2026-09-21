@@ -58,6 +58,14 @@ test("level seven explains how the pressure switch opens the gate", () => {
   assert.match(appSource, /level === 6[\s\S]*箱を赤いスイッチへ運ぶとゲートが開きます[\s\S]*開いた通路を抜け/);
 });
 
+test("level eight explains how the box tilts the seesaw", () => {
+  assert.match(appSource, /world\.level === 8 && shotsRef\.current < 2/);
+  assert.match(appSource, /① 左へ長く → 箱を左側へ/);
+  assert.match(appSource, /① 右側が上がった！/);
+  assert.match(appSource, /② 右下へ短く → 高いクッション/);
+  assert.match(appSource, /level === 7[\s\S]*箱をシーソーの左側へ動かすと、反対側が高く上がります[\s\S]*高くなった右側のクッションへ着地/);
+});
+
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*全レベル クリア！/);
 });
