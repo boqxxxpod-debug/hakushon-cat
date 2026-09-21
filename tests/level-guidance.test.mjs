@@ -20,12 +20,11 @@ test("level two explains how wind and recoil move the box and cat apart", () => 
   assert.match(appSource, /level === 2[\s\S]*風で箱を左へ押しながら反動で右へ移動[\s\S]*箱が空けたクッションへ戻ります/);
 });
 
-test("level three explains both wall-setup steps and their drag directions", () => {
-  assert.match(appSource, /world\.level === 3 && shotsRef\.current < 2/);
-  assert.match(appSource, /① 右へ長くドラッグ → 左壁へ/);
-  assert.match(appSource, /① 左壁まで移動できた！/);
-  assert.match(appSource, /② 左下へ長くドラッグ → 壁越え/);
-  assert.match(appSource, /最初はネコを右へ長くドラッグして左壁まで移動[\s\S]*次に左下へ長くドラッグ/);
+test("level three explains the low-friction ice surface", () => {
+  assert.match(appSource, /world\.level === 3 && shotsRef\.current < 1/);
+  assert.match(appSource, /氷の上は止まりにくい！/);
+  assert.match(appSource, /右へ長くドラッグ → 左へ滑る/);
+  assert.match(appSource, /level === 3[\s\S]*氷の上ではネコが長く滑ります[\s\S]*氷の先のクッションで止まりましょう/);
 });
 
 test("level four explains how wind and recoil move the box and cat apart", () => {
@@ -37,5 +36,5 @@ test("level four explains how wind and recoil move the box and cat apart", () =>
 });
 
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは壁で向きを変えよう[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*全レベル クリア！/);
 });
