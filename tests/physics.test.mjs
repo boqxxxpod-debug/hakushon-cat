@@ -61,30 +61,38 @@ test("level one teaches recoil with two safe horizontal sneezes", () => {
   assert.ok(world.cat.x >= LEFT_WALL + CAT_R);
 });
 
-test("level two is a deterministic low-wall practice layout without a box", () => {
+test("level two is a deterministic box-pushing layout", () => {
   const first = freshPhysics(2);
   const second = freshPhysics(2);
 
   assert.deepEqual(first, second);
   assert.equal(first.level, 2);
   assert.notDeepEqual(first.cat, freshPhysics(1).cat);
-  assert.equal(first.box, null);
-  assert.equal(first.obstacles.length, 1);
-  assert.equal(first.obstacles[0].height, 30);
-  assert.ok(LEVELS[2].goal.right - LEVELS[2].goal.left > LEVELS[1].goal.right - LEVELS[1].goal.left);
+  assert.deepEqual(first.box, { x: 175, y: FLOOR_Y - BOX_HALF, vx: 0, vy: 0 });
+  assert.deepEqual(first.obstacles, []);
+  assert.ok(first.box.x > LEVELS[2].goal.left);
 });
 
-test("level two clears in one recoil across the accepted angle and power tolerance", () => {
+test("level two pushes the box and cat apart before a tolerant return shot", () => {
   const angles = [37, 41, 45, 49, 53];
   const powers = [0.9, 0.95, 1];
 
   for (const angle of angles) {
     for (const power of powers) {
       const world = freshPhysics(2);
+      const startingCatX = world.cat.x;
+      const startingBoxX = world.box.x;
+      const boxReceivedWind = applySneeze(world, -1, 0, 1);
+
+      assert.equal(boxReceivedWind, true);
+      for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+      assert.ok(world.cat.x > startingCatX, "the recoil should move the cat right");
+      assert.ok(world.box.x < startingBoxX, "the wind should push the box left");
+      assert.ok(world.box.x <= 100, "the first shot should clear the cushion");
+
       const radians = (angle * Math.PI) / 180;
-      const velocity = sneezeVelocity(-Math.cos(radians), Math.sin(radians), power);
-      world.cat.vx = velocity.vx;
-      world.cat.vy = velocity.vy;
+      applySneeze(world, Math.cos(radians), Math.sin(radians), power);
 
       for (let frame = 0; frame < 240 && world.goalHold < 0.6; frame += 1) {
         stepPhysics(world, 1 / 60);
@@ -92,10 +100,21 @@ test("level two clears in one recoil across the accepted angle and power toleran
 
       assert.ok(
         world.goalHold >= 0.6,
-        `expected one-shot clear at ${angle} degrees and ${Math.round(power * 100)}% power`,
+        `expected Level 2 clear at ${angle} degrees and ${Math.round(power * 100)}% power`,
       );
     }
   }
+});
+
+test("level two cannot return to the cushion before moving its box", () => {
+  const world = freshPhysics(2);
+  const radians = (45 * Math.PI) / 180;
+  const boxReceivedWind = applySneeze(world, Math.cos(radians), Math.sin(radians), 0.95);
+
+  assert.equal(boxReceivedWind, false);
+  for (let frame = 0; frame < 240; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.ok(world.goalHold < 0.6);
 });
 
 test("level three uses the left wall as a setup for a tolerant second recoil", () => {
@@ -232,11 +251,11 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 2, vy: 1 }), true);
   assert.equal(isRestingOnCushion({ x: 160, y: 520, vx: 0, vy: 0 }), false);
   assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 43, vy: 0 }), false);
-  assert.equal(isRestingOnCushion({ x: 285, y: 520, vx: 2, vy: 1 }, 2), true);
+  assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 2), true);
   assert.equal(isRestingOnCushion({ x: 92, y: 520, vx: 2, vy: 1 }, 2), false);
   assert.equal(isRestingOnCushion({ x: 245, y: 520, vx: 2, vy: 1 }, 3), true);
   assert.equal(isRestingOnCushion({ x: 130, y: 520, vx: 2, vy: 1 }, 3), false);
-  assert.ok(LEVELS[2].goal.left > LEVELS[1].goal.right);
+  assert.ok(LEVELS[2].box.x > LEVELS[2].goal.left);
   assert.ok(LEVELS[3].goal.left > LEVELS[3].obstacles[0].x + LEVELS[3].obstacles[0].width);
   assert.ok(LEVELS[4].box.x > LEVELS[4].goal.left);
 });
