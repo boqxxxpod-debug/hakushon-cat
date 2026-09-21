@@ -12,6 +12,14 @@ test("level one explains the two-step recoil lesson", () => {
   assert.match(appSource, /level === 1[\s\S]*反動で左へ動きます。2回ほど繰り返してクッションで止まりましょう/);
 });
 
+test("level two explains how wind and recoil move the box and cat apart", () => {
+  assert.match(appSource, /world\.level === 2 && shotsRef\.current < 2/);
+  assert.match(appSource, /① 左へ長くドラッグ → 箱を押す/);
+  assert.match(appSource, /① 箱をどかせた！/);
+  assert.match(appSource, /② 右下へ長くドラッグ → ゴール/);
+  assert.match(appSource, /level === 2[\s\S]*風で箱を左へ押しながら反動で右へ移動[\s\S]*箱が空けたクッションへ戻ります/);
+});
+
 test("level three explains both wall-setup steps and their drag directions", () => {
   assert.match(appSource, /world\.level === 3 && shotsRef\.current < 2/);
   assert.match(appSource, /① 右へ長くドラッグ → 左壁へ/);
@@ -28,6 +36,6 @@ test("level four explains how wind and recoil move the box and cat apart", () =>
   assert.match(appSource, /風で箱を左へ押しながら反動で右へ移動[\s\S]*箱が空けたクッションへ戻ります/);
 });
 
-test("levels two and three lead into the new stages before the final completion message", () => {
-  assert.match(appSource, /level === 2[\s\S]*つぎは壁で向きを変えよう[\s\S]*つぎは箱をどけよう[\s\S]*全レベル クリア！/);
+test("the clear messages lead into the next stage before final completion", () => {
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは壁で向きを変えよう[\s\S]*全レベル クリア！/);
 });

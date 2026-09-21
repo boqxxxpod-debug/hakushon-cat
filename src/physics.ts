@@ -68,11 +68,11 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
   },
   2: {
     id: 2,
-    cat: { x: 82, y: FLOOR_Y - CAT_R },
-    box: null,
-    goal: { left: 218, right: 333, top: 486, bottom: 522 },
-    obstacles: [{ x: 185, y: FLOOR_Y - 30, width: 24, height: 30 }],
-    hint: "左下へ長くドラッグ！",
+    cat: { x: 250, y: FLOOR_Y - CAT_R },
+    box: { x: 175, y: FLOOR_Y - BOX_HALF },
+    goal: { left: 128, right: 166, top: 486, bottom: 522 },
+    obstacles: [],
+    hint: "箱を左へ → 右下へ！",
   },
   3: {
     id: 3,

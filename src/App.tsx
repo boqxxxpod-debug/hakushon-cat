@@ -336,19 +336,21 @@ export default function Home() {
       drawAim(world);
 
       const showLevelOneGuide = world.level === 1 && shotsRef.current < 2;
+      const showLevelTwoGuide = world.level === 2 && shotsRef.current < 2;
       const showLevelThreeGuide = world.level === 3 && shotsRef.current < 2;
       const showLevelFourGuide = world.level === 4 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelThreeGuide || showLevelFourGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide)
       ) {
         const isLevelOne = world.level === 1;
+        const isLevelTwo = world.level === 2;
         const isLevelThree = world.level === 3;
         const isLevelFour = world.level === 4;
         const reachedLeftWall = world.cat.x <= LEFT_WALL + CAT_R + 8;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelThree || isLevelFour ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -363,6 +365,16 @@ export default function Home() {
           );
           ctx.fillStyle = shotsRef.current === 0 ? "#59657c" : "#26334d";
           ctx.fillText("② もう一度右へ → クッション", 180, 187);
+        } else if (isLevelTwo || isLevelFour) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = movedBoxAside ? "#28794f" : "#26334d";
+          ctx.fillText(
+            movedBoxAside ? "① 箱をどかせた！" : "① 左へ長くドラッグ → 箱を押す",
+            180,
+            158,
+          );
+          ctx.fillStyle = movedBoxAside ? "#26334d" : "#59657c";
+          ctx.fillText("② 右下へ長くドラッグ → ゴール", 180, 187);
         } else if (isLevelThree) {
           ctx.font = "800 15px system-ui, sans-serif";
           ctx.fillStyle = reachedLeftWall ? "#28794f" : "#26334d";
@@ -373,16 +385,6 @@ export default function Home() {
           );
           ctx.fillStyle = reachedLeftWall ? "#26334d" : "#59657c";
           ctx.fillText("② 左下へ長くドラッグ → 壁越え", 180, 187);
-        } else if (isLevelFour) {
-          ctx.font = "800 15px system-ui, sans-serif";
-          ctx.fillStyle = movedBoxAside ? "#28794f" : "#26334d";
-          ctx.fillText(
-            movedBoxAside ? "① 箱をどかせた！" : "① 左へ長くドラッグ → 箱を押す",
-            180,
-            158,
-          );
-          ctx.fillStyle = movedBoxAside ? "#26334d" : "#59657c";
-          ctx.fillText("② 右下へ長くドラッグ → ゴール", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -483,7 +485,7 @@ export default function Home() {
               level === 1
                 ? "ネコを押して右へ長くドラッグし、離すとくしゃみます。ネコは反動で左へ動きます。2回ほど繰り返してクッションで止まりましょう。"
                 : level === 2
-                  ? "ネコを押して左下へ長くドラッグし、離すとくしゃみます。ネコは反動で右上へ動きます。"
+                  ? "最初はネコを左へ長くドラッグし、風で箱を左へ押しながら反動で右へ移動します。次に右下へ長くドラッグし、箱が空けたクッションへ戻ります。"
                   : level === 3
                     ? "最初はネコを右へ長くドラッグして左壁まで移動します。次に左下へ長くドラッグし、反動で中央の壁を越えます。"
                     : "最初はネコを左へ長くドラッグし、風で箱を左へ押しながら反動で右へ移動します。次に右下へ長くドラッグし、箱が空けたクッションへ戻ります。"
@@ -516,7 +518,7 @@ export default function Home() {
                 <h2 id="win-title">おひるね成功！</h2>
                 <p id="win-message">
                   {level === 1
-                    ? "つぎは障害物をこえよう"
+                    ? "つぎは箱をどかそう"
                     : level === 2
                       ? "つぎは壁で向きを変えよう"
                       : level === 3
