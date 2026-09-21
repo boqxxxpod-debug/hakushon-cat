@@ -267,6 +267,51 @@ export default function Home() {
         }
       }
 
+      world.movingPlatforms.forEach((platform, index) => {
+        const position = world.platformPositions[index];
+        ctx.save();
+        ctx.strokeStyle = "rgba(64, 91, 118, .38)";
+        ctx.lineWidth = 4;
+        ctx.setLineDash([7, 8]);
+        ctx.beginPath();
+        if (platform.axis === "x") {
+          ctx.moveTo(platform.x - platform.distance, platform.y + platform.height / 2);
+          ctx.lineTo(
+            platform.x + platform.distance + platform.width,
+            platform.y + platform.height / 2,
+          );
+        } else {
+          ctx.moveTo(platform.x + platform.width / 2, platform.y - platform.distance);
+          ctx.lineTo(
+            platform.x + platform.width / 2,
+            platform.y + platform.distance + platform.height,
+          );
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.shadowColor = world.platformContacts[index]
+          ? "rgba(48, 177, 211, .52)"
+          : "rgba(40, 74, 100, .25)";
+        ctx.shadowBlur = world.platformContacts[index] ? 15 : 8;
+        roundedRect(ctx, position.x, position.y, position.width, position.height, 7);
+        ctx.fillStyle = "#5bc3dc";
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = "#246e89";
+        ctx.lineWidth = 3;
+        roundedRect(ctx, position.x, position.y, position.width, position.height, 7);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.78)";
+        ctx.beginPath();
+        ctx.moveTo(position.x + position.width / 2 - 13, position.y + 4);
+        ctx.lineTo(position.x + position.width / 2, position.y + position.height - 4);
+        ctx.lineTo(position.x + position.width / 2 + 13, position.y + 4);
+        ctx.closePath();
+        ctx.fill();
+      });
+
       world.springs.forEach((spring, index) => {
         const compressed = world.springArmed[index] === false;
         const springY = compressed ? FLOOR_Y - 8 : FLOOR_Y - 17;
@@ -573,10 +618,11 @@ export default function Home() {
       const showLevelSevenGuide = world.level === 7 && shotsRef.current < 2;
       const showLevelEightGuide = world.level === 8 && shotsRef.current < 2;
       const showLevelNineGuide = world.level === 9 && shotsRef.current < 2;
+      const showLevelTenGuide = world.level === 10 && shotsRef.current < 1;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -587,9 +633,10 @@ export default function Home() {
         const isLevelSeven = world.level === 7;
         const isLevelEight = world.level === 8;
         const isLevelNine = world.level === 9;
+        const isLevelTen = world.level === 10;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -678,6 +725,19 @@ export default function Home() {
           );
           ctx.fillStyle = wallIsBroken ? "#26334d" : "#59657c";
           ctx.fillText("② 左下へ長く → 通り抜ける", 180, 187);
+        } else if (isLevelTen) {
+          const platform = world.movingPlatforms[0];
+          const position = world.platformPositions[0];
+          const atLaunchPoint = position.x >= platform.x + platform.distance - 12;
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = atLaunchPoint ? "#28794f" : "#246e89";
+          ctx.fillText(
+            atLaunchPoint ? "いま！ 左下へ短く" : "足場が右端まで来たら…",
+            180,
+            158,
+          );
+          ctx.fillStyle = "#26334d";
+          ctx.fillText("反動で右上のクッションへ", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -791,7 +851,9 @@ export default function Home() {
                             ? "箱を赤いスイッチへ運ぶとゲートが開きます。箱を載せたまま、右下へ長くドラッグして開いた通路を抜け、クッションへ戻りましょう。"
                             : level === 8
                               ? "箱をシーソーの左側へ動かすと、反対側が高く上がります。右下へ短くドラッグし、高くなった右側のクッションへ着地しましょう。"
-                              : "右へ長くドラッグし、箱を十分に加速して壁へぶつけます。壁が壊れたら左下へ長くドラッグし、反動で開いた通路を抜けましょう。"
+                              : level === 9
+                                ? "右へ長くドラッグし、箱を十分に加速して壁へぶつけます。壁が壊れたら左下へ長くドラッグし、反動で開いた通路を抜けましょう。"
+                                : "ネコは水色の足場に乗ったまま運ばれます。足場が右端へ近づいた瞬間に左下へ短くドラッグし、反動で右上の最終クッションへ着地しましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -836,7 +898,9 @@ export default function Home() {
                                 ? "つぎはシーソーで登ろう"
                                 : level === 8
                                   ? "つぎは壁を壊そう"
-                                  : "全レベル クリア！"}
+                                  : level === 9
+                                    ? "つぎは動く足場へ"
+                                    : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (

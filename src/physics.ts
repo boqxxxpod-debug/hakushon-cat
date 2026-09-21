@@ -10,7 +10,7 @@ export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export type Obstacle = {
   x: number;
@@ -53,6 +53,13 @@ export type BreakableWall = Obstacle & {
   minImpact: number;
 };
 
+export type MovingPlatform = Obstacle & {
+  axis: "x" | "y";
+  distance: number;
+  period: number;
+  phase: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -66,6 +73,7 @@ export type LevelDefinition = {
   gates: Gate[];
   seesaws: Seesaw[];
   breakableWalls: BreakableWall[];
+  movingPlatforms: MovingPlatform[];
   hint: string;
 };
 
@@ -97,6 +105,10 @@ export type PhysicsState = {
   breakableWalls: BreakableWall[];
   wallHealth: number[];
   wallBroken: boolean[];
+  movingPlatforms: MovingPlatform[];
+  platformTime: number;
+  platformPositions: Obstacle[];
+  platformContacts: boolean[];
   goalHold: number;
 };
 
@@ -128,6 +140,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     gates: [],
     seesaws: [],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -143,6 +156,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     gates: [],
     seesaws: [],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
@@ -158,6 +172,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     gates: [],
     seesaws: [],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "氷の上はツルツル！",
   },
   4: {
@@ -173,6 +188,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     gates: [],
     seesaws: [],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "バネに乗って高い足場へ！",
   },
   5: {
@@ -188,6 +204,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     gates: [],
     seesaws: [],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "弱い風で風船をどかそう！",
   },
   6: {
@@ -203,6 +220,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     gates: [],
     seesaws: [],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "箱を置いてスイッチON！",
   },
   7: {
@@ -218,6 +236,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     gates: [{ x: 207, y: 145, width: 14, height: 400, switchIndex: 0 }],
     seesaws: [],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "スイッチでゲートOPEN！",
   },
   8: {
@@ -240,6 +259,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
       angularSpeed: 1.8,
     }],
     breakableWalls: [],
+    movingPlatforms: [],
     hint: "箱でシーソーを傾けよう！",
   },
   9: {
@@ -262,7 +282,33 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
       durability: 100,
       minImpact: 330,
     }],
+    movingPlatforms: [],
     hint: "箱を加速して壁を壊せ！",
+  },
+  10: {
+    id: 10,
+    cat: { x: 80, y: 455 },
+    box: null,
+    balloon: null,
+    goal: { left: 289, right: 331, top: 405, bottom: 433 },
+    obstacles: [{ x: 280, y: 455, width: 62, height: 90 }],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [],
+    movingPlatforms: [{
+      x: 110,
+      y: 480,
+      width: 90,
+      height: 14,
+      axis: "x",
+      distance: 75,
+      period: 4,
+      phase: -Math.PI / 2,
+    }],
+    hint: "右端でタイミングよく飛ぼう！",
   },
 };
 
@@ -275,7 +321,19 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 6) return 7;
   if (level === 7) return 8;
   if (level === 8) return 9;
+  if (level === 9) return 10;
   return null;
+}
+
+export function movingPlatformPosition(platform: MovingPlatform, time: number): Obstacle {
+  const offset = Math.sin((time / platform.period) * Math.PI * 2 + platform.phase)
+    * platform.distance;
+  return {
+    x: platform.axis === "x" ? platform.x + offset : platform.x,
+    y: platform.axis === "y" ? platform.y + offset : platform.y,
+    width: platform.width,
+    height: platform.height,
+  };
 }
 
 export function freshPhysics(level: LevelId = 1): PhysicsState {
@@ -299,6 +357,12 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     breakableWalls: definition.breakableWalls.map((wall) => ({ ...wall })),
     wallHealth: definition.breakableWalls.map((wall) => wall.durability),
     wallBroken: definition.breakableWalls.map(() => false),
+    movingPlatforms: definition.movingPlatforms.map((platform) => ({ ...platform })),
+    platformTime: 0,
+    platformPositions: definition.movingPlatforms.map(
+      (platform) => movingPlatformPosition(platform, 0),
+    ),
+    platformContacts: definition.movingPlatforms.map(() => false),
     goalHold: 0,
   };
 }
@@ -689,7 +753,55 @@ export function isSeesawReady(world: PhysicsState) {
   return world.box !== null && angle <= -0.12 && world.box.x <= seesaw.x - 35;
 }
 
+function bodyStandingOnPlatform(body: Body, radius: number, platform: Obstacle) {
+  return (
+    body.vy >= -20 &&
+    Math.abs(body.y + radius - platform.y) <= 3 &&
+    body.x >= platform.x - radius * 0.35 &&
+    body.x <= platform.x + platform.width + radius * 0.35
+  );
+}
+
+function movePlatformsAndCarry(world: PhysicsState, dt: number) {
+  const previousPositions = world.platformPositions;
+  const catRides = previousPositions.map(
+    (platform) => bodyStandingOnPlatform(world.cat, CAT_R, platform),
+  );
+  const boxRides = previousPositions.map(
+    (platform) => world.box !== null && bodyStandingOnPlatform(world.box, BOX_HALF, platform),
+  );
+
+  world.platformTime += dt;
+  world.platformPositions = world.movingPlatforms.map(
+    (platform) => movingPlatformPosition(platform, world.platformTime),
+  );
+
+  world.platformPositions.forEach((platform, index) => {
+    const previous = previousPositions[index];
+    const dx = platform.x - previous.x;
+    const dy = platform.y - previous.y;
+    if (catRides[index]) {
+      world.cat.x += dx;
+      world.cat.y += dy;
+    }
+    if (boxRides[index] && world.box) {
+      world.box.x += dx;
+      world.box.y += dy;
+    }
+  });
+}
+
+function stepMovingPlatforms(world: PhysicsState, dt: number) {
+  world.platformContacts = world.platformPositions.map((platform) => {
+    const catOnTop = resolveBodyObstacle(world.cat, CAT_R, platform);
+    if (catOnTop) world.cat.vx = approach(world.cat.vx, 0, 420 * dt);
+    if (world.box) resolveBodyObstacle(world.box, BOX_HALF, platform);
+    return catOnTop;
+  });
+}
+
 export function stepPhysics(world: PhysicsState, dt: number) {
+  movePlatformsAndCarry(world, dt);
   const bodies = world.box ? [world.cat, world.box] : [world.cat];
   for (const body of bodies) {
     body.vy += 1180 * dt;
@@ -728,6 +840,7 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   stepGates(world);
   stepBreakableWalls(world);
   stepSeesaws(world, dt);
+  stepMovingPlatforms(world, dt);
 
   const goalUnlocked = (
     (world.level !== 5 || world.balloonCleared) &&

@@ -74,6 +74,14 @@ test("level nine explains how a fast box breaks the wall", () => {
   assert.match(appSource, /level === 8[\s\S]*箱を十分に加速して壁へぶつけます[\s\S]*反動で開いた通路を抜けましょう/);
 });
 
+test("level ten explains the moving-platform timing window", () => {
+  assert.match(appSource, /world\.level === 10 && shotsRef\.current < 1/);
+  assert.match(appSource, /足場が右端まで来たら…/);
+  assert.match(appSource, /いま！ 左下へ短く/);
+  assert.match(appSource, /反動で右上のクッションへ/);
+  assert.match(appSource, /level === 9[\s\S]*足場が右端へ近づいた瞬間に左下へ短くドラッグ[\s\S]*最終クッションへ着地/);
+});
+
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*全レベル クリア！/);
 });
