@@ -15,6 +15,7 @@ import {
   freshPhysics,
   isSeesawReady,
   isRestingOnCushion,
+  movingPlatformPosition,
   nextLevel,
   powerForDistance,
   sneezeVelocity,
@@ -188,7 +189,7 @@ test("level four uses its spring to reach the raised cushion", () => {
   assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
-test("level progression reaches level nine and restart preserves the current level", () => {
+test("level progression reaches level ten and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
@@ -197,7 +198,8 @@ test("level progression reaches level nine and restart preserves the current lev
   assert.equal(nextLevel(6), 7);
   assert.equal(nextLevel(7), 8);
   assert.equal(nextLevel(8), 9);
-  assert.equal(nextLevel(9), null);
+  assert.equal(nextLevel(9), 10);
+  assert.equal(nextLevel(10), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
@@ -206,6 +208,7 @@ test("level progression reaches level nine and restart preserves the current lev
   assert.deepEqual(freshPhysics(nextLevel(6)), freshPhysics(7));
   assert.deepEqual(freshPhysics(nextLevel(7)), freshPhysics(8));
   assert.deepEqual(freshPhysics(nextLevel(8)), freshPhysics(9));
+  assert.deepEqual(freshPhysics(nextLevel(9)), freshPhysics(10));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
@@ -214,6 +217,7 @@ test("level progression reaches level nine and restart preserves the current lev
   assert.deepEqual(freshPhysics(7), freshPhysics(7));
   assert.deepEqual(freshPhysics(8), freshPhysics(8));
   assert.deepEqual(freshPhysics(9), freshPhysics(9));
+  assert.deepEqual(freshPhysics(10), freshPhysics(10));
 });
 
 test("level five balloon responds farther than a box to the same wind", () => {
@@ -490,6 +494,71 @@ test("level nine has a verified smash-and-return solution", () => {
   assert.ok(world.cat.x > world.breakableWalls[0].x + world.breakableWalls[0].width);
 });
 
+test("level ten platform follows a deterministic fixed-range cycle", () => {
+  const platform = LEVELS[10].movingPlatforms[0];
+  assert.deepEqual(movingPlatformPosition(platform, 0), {
+    x: 35,
+    y: 480,
+    width: 90,
+    height: 14,
+  });
+  assert.ok(Math.abs(movingPlatformPosition(platform, 1).x - 110) < 0.001);
+  assert.ok(Math.abs(movingPlatformPosition(platform, 2).x - 185) < 0.001);
+  assert.ok(Math.abs(movingPlatformPosition(platform, 3).x - 110) < 0.001);
+  assert.ok(Math.abs(movingPlatformPosition(platform, 4).x - 35) < 0.001);
+
+  for (let sample = 0; sample <= 80; sample += 1) {
+    const position = movingPlatformPosition(platform, sample / 10);
+    assert.ok(position.x >= platform.x - platform.distance - 0.001);
+    assert.ok(position.x <= platform.x + platform.distance + 0.001);
+  }
+});
+
+test("level ten platform carries the cat until the cat jumps away", () => {
+  const world = freshPhysics(10);
+  const initialOffset = world.cat.x - world.platformPositions[0].x;
+
+  for (let frame = 0; frame < 110; frame += 1) stepPhysics(world, 1 / 60);
+  assert.ok(world.platformContacts[0]);
+  assert.ok(Math.abs(world.cat.x - world.platformPositions[0].x - initialOffset) < 0.01);
+  assert.ok(Math.abs(world.cat.y - 455) < 0.01);
+
+  const radians = (130 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.35);
+  stepPhysics(world, 1 / 60);
+  assert.equal(world.platformContacts[0], false);
+  const offsetAfterJump = world.cat.x - world.platformPositions[0].x;
+  for (let frame = 0; frame < 12; frame += 1) stepPhysics(world, 1 / 60);
+  assert.notEqual(world.cat.x - world.platformPositions[0].x, offsetAfterJump);
+});
+
+test("level ten early departure misses the final cushion", () => {
+  const world = freshPhysics(10);
+  const radians = (130 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.35);
+  for (let frame = 0; frame < 300; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.equal(world.goalHold, 0);
+  assert.ok(world.cat.x < LEVELS[10].goal.left);
+});
+
+test("level ten has a verified timed platform departure", () => {
+  const world = freshPhysics(10);
+  for (let frame = 0; frame < 110; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.ok(world.platformPositions[0].x > 175);
+  assert.ok(world.platformContacts[0]);
+
+  const radians = (130 * Math.PI) / 180;
+  applySneeze(world, Math.cos(radians), Math.sin(radians), 0.35);
+  for (let frame = 0; frame < 300 && world.goalHold < 0.6; frame += 1) {
+    stepPhysics(world, 1 / 60);
+  }
+
+  assert.ok(world.goalHold >= 0.6);
+  assert.equal(world.platformContacts[0], false);
+});
+
 test("power is clamped between minimum and maximum", () => {
   assert.equal(powerForDistance(0), 0.25);
   assert.equal(powerForDistance(MAX_AIM_DISTANCE / 2), 0.5);
@@ -522,5 +591,6 @@ test("the cushion accepts only a slow cat inside its goal bounds", () => {
   assert.equal(isRestingOnCushion({ x: 145, y: 520, vx: 2, vy: 1 }, 7), true);
   assert.equal(isRestingOnCushion({ x: 280, y: 425, vx: 2, vy: 1 }, 8), true);
   assert.equal(isRestingOnCushion({ x: 220, y: 520, vx: 2, vy: 1 }, 9), true);
+  assert.equal(isRestingOnCushion({ x: 305, y: 430, vx: 2, vy: 1 }, 10), true);
   assert.ok(LEVELS[4].goal.bottom < LEVELS[3].goal.bottom);
 });
