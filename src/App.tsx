@@ -212,7 +212,10 @@ export default function Home() {
     const draw = () => {
       const world = physicsRef.current;
       const definition = LEVELS[world.level];
-      const goalLocked = world.level === 5 && !world.balloonCleared;
+      const goalLocked = (
+        (world.level === 5 && !world.balloonCleared) ||
+        (world.level === 6 && !world.switchOn.every(Boolean))
+      );
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
       const background = ctx.createLinearGradient(0, 0, 0, WORLD_H);
@@ -280,6 +283,26 @@ export default function Home() {
         ctx.stroke();
       });
 
+      world.switches.forEach((pressureSwitch, index) => {
+        const isOn = world.switchOn[index];
+        const switchY = isOn ? FLOOR_Y - 7 : FLOOR_Y - 13;
+        ctx.save();
+        ctx.shadowColor = isOn ? "rgba(55, 181, 105, .42)" : "rgba(210, 69, 69, .25)";
+        ctx.shadowBlur = isOn ? 14 : 7;
+        roundedRect(ctx, pressureSwitch.x, switchY, pressureSwitch.width, isOn ? 8 : 14, 5);
+        ctx.fillStyle = isOn ? "#5bd089" : "#ef6b67";
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = isOn ? "#237948" : "#9e3437";
+        ctx.lineWidth = 3;
+        roundedRect(ctx, pressureSwitch.x, switchY, pressureSwitch.width, isOn ? 8 : 14, 5);
+        ctx.stroke();
+        ctx.fillStyle = isOn ? "#237948" : "#9e3437";
+        ctx.font = "900 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(isOn ? "ON" : "OFF", pressureSwitch.x + pressureSwitch.width / 2, FLOOR_Y + 20);
+      });
+
       ctx.save();
       ctx.shadowColor = "rgba(52, 110, 80, .2)";
       ctx.shadowBlur = 10;
@@ -297,7 +320,11 @@ export default function Home() {
       ctx.fillStyle = goalLocked ? "#555d70" : "#28794f";
       ctx.font = "800 11px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(goalLocked ? "ふうせん待ち" : "おひるね", goalX + goalWidth / 2, goalY + 16);
+      ctx.fillText(
+        goalLocked ? (world.level === 6 ? "スイッチ待ち" : "ふうせん待ち") : "おひるね",
+        goalX + goalWidth / 2,
+        goalY + 16,
+      );
 
       for (const obstacle of world.obstacles) {
         ctx.fillStyle = "#66748d";
@@ -408,18 +435,21 @@ export default function Home() {
       const showLevelThreeGuide = world.level === 3 && shotsRef.current < 1;
       const showLevelFourGuide = world.level === 4 && shotsRef.current < 1;
       const showLevelFiveGuide = world.level === 5 && shotsRef.current < 2;
+      const showLevelSixGuide = world.level === 6 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
         const isLevelThree = world.level === 3;
         const isLevelFour = world.level === 4;
         const isLevelFive = world.level === 5;
+        const isLevelSix = world.level === 6;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive ? 82 : 70, 18);
+        const switchIsOn = world.switchOn.every(Boolean);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -465,6 +495,16 @@ export default function Home() {
             158,
           );
           ctx.fillStyle = world.balloonCleared ? "#26334d" : "#59657c";
+          ctx.fillText("② 右下へ長く → クッション", 180, 187);
+        } else if (isLevelSix) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = switchIsOn ? "#28794f" : "#9e3437";
+          ctx.fillText(
+            switchIsOn ? "① スイッチON！" : "① 左へ長く → 箱をスイッチへ",
+            180,
+            158,
+          );
+          ctx.fillStyle = switchIsOn ? "#26334d" : "#59657c";
           ctx.fillText("② 右下へ長く → クッション", 180, 187);
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
@@ -571,7 +611,9 @@ export default function Home() {
                     ? "氷の上ではネコが長く滑ります。ネコを右へ長くドラッグし、反動で左へ滑って氷の先のクッションで止まりましょう。"
                     : level === 4
                       ? "ネコを左へ長くドラッグし、反動で右のバネへ乗せます。バネで跳ね上がり、高い足場のクッションへ着地しましょう。"
-                      : "最初は左へ短くドラッグし、軽い風船だけを大きく動かします。次に右下へ長くドラッグし、空いたクッションへ戻りましょう。"
+                      : level === 5
+                        ? "最初は左へ短くドラッグし、軽い風船だけを大きく動かします。次に右下へ長くドラッグし、空いたクッションへ戻りましょう。"
+                        : "最初は左へ長くドラッグし、箱を赤いスイッチまで運んでONにします。次に右下へ長くドラッグし、使えるようになったクッションへ戻りましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -608,7 +650,9 @@ export default function Home() {
                         ? "つぎはバネでジャンプ"
                         : level === 4
                           ? "つぎは風船を飛ばそう"
-                          : "全レベル クリア！"}
+                          : level === 5
+                            ? "つぎはスイッチON"
+                            : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (

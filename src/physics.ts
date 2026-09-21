@@ -10,7 +10,7 @@ export const MAX_AIM_DISTANCE = 120;
 export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type Obstacle = {
   x: number;
@@ -30,6 +30,11 @@ export type SpringPad = {
   launchVelocity: number;
 };
 
+export type PressureSwitch = {
+  x: number;
+  width: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -39,6 +44,7 @@ export type LevelDefinition = {
   obstacles: Obstacle[];
   iceZones: IceZone[];
   springs: SpringPad[];
+  switches: PressureSwitch[];
   hint: string;
 };
 
@@ -61,6 +67,8 @@ export type PhysicsState = {
   iceZones: IceZone[];
   springs: SpringPad[];
   springArmed: boolean[];
+  switches: PressureSwitch[];
+  switchOn: boolean[];
   goalHold: number;
 };
 
@@ -88,6 +96,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     obstacles: [],
     iceZones: [],
     springs: [],
+    switches: [],
     hint: "右へ2回、反動で左へ！",
   },
   2: {
@@ -99,6 +108,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     obstacles: [],
     iceZones: [],
     springs: [],
+    switches: [],
     hint: "箱を左へ → 右下へ！",
   },
   3: {
@@ -110,6 +120,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     obstacles: [],
     iceZones: [{ x: 112, width: 213 }],
     springs: [],
+    switches: [],
     hint: "氷の上はツルツル！",
   },
   4: {
@@ -121,6 +132,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     obstacles: [{ x: 220, y: 405, width: 112, height: 140 }],
     iceZones: [],
     springs: [{ x: 135, width: 65, launchVelocity: 760 }],
+    switches: [],
     hint: "バネに乗って高い足場へ！",
   },
   5: {
@@ -132,7 +144,20 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     obstacles: [],
     iceZones: [],
     springs: [],
+    switches: [],
     hint: "弱い風で風船をどかそう！",
+  },
+  6: {
+    id: 6,
+    cat: { x: 250, y: FLOOR_Y - CAT_R },
+    box: { x: 175, y: FLOOR_Y - BOX_HALF },
+    balloon: null,
+    goal: { left: 128, right: 166, top: 486, bottom: 522 },
+    obstacles: [],
+    iceZones: [],
+    springs: [],
+    switches: [{ x: 26, width: 65 }],
+    hint: "箱を置いてスイッチON！",
   },
 };
 
@@ -141,6 +166,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 2) return 3;
   if (level === 3) return 4;
   if (level === 4) return 5;
+  if (level === 5) return 6;
   return null;
 }
 
@@ -156,6 +182,8 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     iceZones: definition.iceZones.map((zone) => ({ ...zone })),
     springs: definition.springs.map((spring) => ({ ...spring })),
     springArmed: definition.springs.map(() => true),
+    switches: definition.switches.map((pressureSwitch) => ({ ...pressureSwitch })),
+    switchOn: definition.switches.map(() => false),
     goalHold: 0,
   };
 }
@@ -391,6 +419,17 @@ function stepSprings(world: PhysicsState) {
   });
 }
 
+function stepSwitches(world: PhysicsState) {
+  const box = world.box;
+  world.switchOn = world.switches.map((pressureSwitch) => (
+    box !== null &&
+    box.x >= pressureSwitch.x &&
+    box.x <= pressureSwitch.x + pressureSwitch.width &&
+    box.y >= FLOOR_Y - BOX_HALF - 0.5 &&
+    Math.hypot(box.vx, box.vy) < 28
+  ));
+}
+
 export function stepPhysics(world: PhysicsState, dt: number) {
   const bodies = world.box ? [world.cat, world.box] : [world.cat];
   for (const body of bodies) {
@@ -426,8 +465,12 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   if (catOnPlatform) world.cat.vx = applyGroundFriction(world.cat.vx, dt);
 
   stepSprings(world);
+  stepSwitches(world);
 
-  const goalUnlocked = world.level !== 5 || world.balloonCleared;
+  const goalUnlocked = (
+    (world.level !== 5 || world.balloonCleared) &&
+    (world.level !== 6 || world.switchOn.every(Boolean))
+  );
   const restingOnCushion = goalUnlocked && isRestingOnCushion(world.cat, world.level);
   world.goalHold = restingOnCushion ? world.goalHold + dt : 0;
 }
