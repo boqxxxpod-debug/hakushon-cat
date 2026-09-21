@@ -335,23 +335,35 @@ export default function Home() {
 
       drawAim(world);
 
+      const showLevelOneGuide = world.level === 1 && shotsRef.current < 2;
       const showLevelThreeGuide = world.level === 3 && shotsRef.current < 2;
       const showLevelFourGuide = world.level === 4 && shotsRef.current < 2;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelThreeGuide || showLevelFourGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelThreeGuide || showLevelFourGuide)
       ) {
+        const isLevelOne = world.level === 1;
         const isLevelThree = world.level === 3;
         const isLevelFour = world.level === 4;
         const reachedLeftWall = world.cat.x <= LEFT_WALL + CAT_R + 8;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
-        roundedRect(ctx, 39, 132, 282, isLevelThree || isLevelFour ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelThree || isLevelFour ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
         ctx.textAlign = "center";
-        if (isLevelThree) {
+        if (isLevelOne) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = shotsRef.current === 0 ? "#26334d" : "#28794f";
+          ctx.fillText(
+            shotsRef.current === 0 ? "① 右へ長くドラッグ" : "① 反動で左へ進めた！",
+            180,
+            158,
+          );
+          ctx.fillStyle = shotsRef.current === 0 ? "#59657c" : "#26334d";
+          ctx.fillText("② もう一度右へ → クッション", 180, 187);
+        } else if (isLevelThree) {
           ctx.font = "800 15px system-ui, sans-serif";
           ctx.fillStyle = reachedLeftWall ? "#28794f" : "#26334d";
           ctx.fillText(
@@ -377,7 +389,7 @@ export default function Home() {
           ctx.font = "700 15px system-ui, sans-serif";
           ctx.fillStyle = "#59657c";
           ctx.fillText(
-            world.level === 1 ? "右へドラッグ → 離して発射" : "左下へ長くドラッグ → 離す",
+            "左下へ長くドラッグ → 離す",
             180,
             182,
           );
@@ -469,7 +481,7 @@ export default function Home() {
             className="game-canvas"
             aria-label={
               level === 1
-                ? "ネコを押して右へドラッグし、離すとくしゃみます。ネコは反動で左へ動きます。"
+                ? "ネコを押して右へ長くドラッグし、離すとくしゃみます。ネコは反動で左へ動きます。2回ほど繰り返してクッションで止まりましょう。"
                 : level === 2
                   ? "ネコを押して左下へ長くドラッグし、離すとくしゃみます。ネコは反動で右上へ動きます。"
                   : level === 3

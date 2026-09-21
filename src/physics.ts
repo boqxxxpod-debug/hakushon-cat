@@ -60,11 +60,11 @@ export type SneezeState = {
 export const LEVELS: Record<LevelId, LevelDefinition> = {
   1: {
     id: 1,
-    cat: { x: 225, y: FLOOR_Y - CAT_R },
-    box: { x: 292, y: FLOOR_Y - BOX_HALF },
-    goal: { left: 43, right: 143, top: 486, bottom: 522 },
+    cat: { x: 285, y: FLOOR_Y - CAT_R },
+    box: null,
+    goal: { left: 48, right: 148, top: 486, bottom: 522 },
     obstacles: [],
-    hint: "右へ くしゃみ！",
+    hint: "右へ2回、反動で左へ！",
   },
   2: {
     id: 2,

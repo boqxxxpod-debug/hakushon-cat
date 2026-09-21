@@ -4,9 +4,12 @@ import test from "node:test";
 
 const appSource = await readFile(new URL("../src/App.tsx", import.meta.url), "utf8");
 
-test("the opening guides give levels one and two their own drag direction", () => {
-  assert.match(appSource, /world\.level === 1[\s\S]*右へドラッグ → 離して発射[\s\S]*左下へ長くドラッグ → 離す/);
-  assert.match(appSource, /level === 1[\s\S]*ネコを押して右へドラッグ[\s\S]*ネコを押して左下へ長くドラッグ/);
+test("level one explains the two-step recoil lesson", () => {
+  assert.match(appSource, /world\.level === 1 && shotsRef\.current < 2/);
+  assert.match(appSource, /① 右へ長くドラッグ/);
+  assert.match(appSource, /① 反動で左へ進めた！/);
+  assert.match(appSource, /② もう一度右へ → クッション/);
+  assert.match(appSource, /level === 1[\s\S]*反動で左へ動きます。2回ほど繰り返してクッションで止まりましょう/);
 });
 
 test("level three explains both wall-setup steps and their drag directions", () => {

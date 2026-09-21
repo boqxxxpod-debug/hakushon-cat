@@ -34,13 +34,31 @@ test("ground friction stops maximum horizontal recoil within about 0.35 seconds"
 test("freshPhysics creates the intended level-one layout", () => {
   const world = freshPhysics();
 
-  assert.deepEqual(world.cat, { x: 225, y: FLOOR_Y - CAT_R, vx: 0, vy: 0 });
-  assert.deepEqual(world.box, { x: 292, y: FLOOR_Y - BOX_HALF, vx: 0, vy: 0 });
-  assert.deepEqual(LEVELS[1].goal, { left: 43, right: 143, top: 486, bottom: 522 });
-  assert.equal(LEVELS[1].hint, "右へ くしゃみ！");
+  assert.deepEqual(world.cat, { x: 285, y: FLOOR_Y - CAT_R, vx: 0, vy: 0 });
+  assert.equal(world.box, null);
+  assert.deepEqual(LEVELS[1].goal, { left: 48, right: 148, top: 486, bottom: 522 });
+  assert.equal(LEVELS[1].hint, "右へ2回、反動で左へ！");
   assert.equal(world.level, 1);
   assert.deepEqual(world.obstacles, []);
   assert.equal(world.goalHold, 0);
+});
+
+test("level one teaches recoil with two safe horizontal sneezes", () => {
+  const world = freshPhysics(1);
+
+  applySneeze(world, 1, 0, 1);
+  for (let frame = 0; frame < 120; frame += 1) stepPhysics(world, 1 / 60);
+
+  assert.ok(world.cat.x > LEVELS[1].goal.right, "one sneeze should stop before the cushion");
+  assert.ok(world.goalHold < 0.6, "one sneeze must not clear the level");
+
+  applySneeze(world, 1, 0, 1);
+  for (let frame = 0; frame < 180 && world.goalHold < 0.6; frame += 1) {
+    stepPhysics(world, 1 / 60);
+  }
+
+  assert.ok(world.goalHold >= 0.6, "the second sneeze should reach the wide cushion");
+  assert.ok(world.cat.x >= LEFT_WALL + CAT_R);
 });
 
 test("level two is a deterministic low-wall practice layout without a box", () => {
