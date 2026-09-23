@@ -577,7 +577,7 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     goal: { left: 300, right: 330, top: 269, bottom: 287 },
     obstacles: [
       { x: 44, y: 170, width: 248, height: 16 },
-      { x: 292, y: 305, width: 50, height: 16 },
+      { x: 252, y: 305, width: 90, height: 16 },
     ],
     iceZones: [],
     springs: [],
