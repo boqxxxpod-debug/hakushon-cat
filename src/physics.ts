@@ -11,7 +11,7 @@ export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 export const ROPE_SNEEZE_SCALE = 0.45;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 export type Obstacle = {
   x: number;
@@ -104,6 +104,22 @@ export type RatchetLift = {
   handleRadius: number;
 };
 
+export type WaterElevator = {
+  tankX: number;
+  tankWidth: number;
+  tankBottomY: number;
+  platformX: number;
+  platformWidth: number;
+  platformHeight: number;
+  highWaterY: number;
+  lowWaterY: number;
+  initialWaterY: number;
+  waterSpeed: number;
+  valveX: number;
+  valveY: number;
+  valveRadius: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -122,6 +138,7 @@ export type LevelDefinition = {
   updraft?: Updraft;
   weightedLift?: WeightedLift;
   ratchetLift?: RatchetLift;
+  waterElevator?: WaterElevator;
   hint: string;
 };
 
@@ -172,6 +189,10 @@ export type PhysicsState = {
   ratchetStage: number;
   ratchetDirection: -1 | 1;
   ratchetEverActivated: boolean;
+  waterSurfaceY: number;
+  waterPlatformY: number;
+  waterFilling: boolean;
+  waterValveEverActivated: boolean;
   goalHold: number;
 };
 
@@ -499,6 +520,42 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     },
     hint: "ハンドルで一段ずつ！",
   },
+  15: {
+    id: 15,
+    cat: { x: 160, y: 475 },
+    box: null,
+    balloon: null,
+    goal: { left: 279, right: 333, top: 348, bottom: 374 },
+    obstacles: [
+      { x: 58, y: 362, width: 16, height: FLOOR_Y - 362 },
+      { x: 246, y: 362, width: 16, height: FLOOR_Y - 362 },
+      { x: 262, y: 386, width: 80, height: FLOOR_Y - 386 },
+    ],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [],
+    movingPlatforms: [],
+    ropes: [],
+    waterElevator: {
+      tankX: 74,
+      tankWidth: 172,
+      tankBottomY: FLOOR_Y,
+      platformX: 74,
+      platformWidth: 172,
+      platformHeight: 14,
+      highWaterY: 365,
+      lowWaterY: 500,
+      initialWaterY: 500,
+      waterSpeed: 80,
+      valveX: 92,
+      valveY: 460,
+      valveRadius: 24,
+    },
+    hint: "バルブで水位を上げよう！",
+  },
 };
 
 export function nextLevel(level: LevelId): LevelId | null {
@@ -515,6 +572,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 11) return 12;
   if (level === 12) return 13;
   if (level === 13) return 14;
+  if (level === 14) return 15;
   return null;
 }
 
@@ -543,6 +601,7 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
   const definition = LEVELS[level];
   const ratchetLift = definition.ratchetLift;
   const ratchetStage = ratchetLift ? ratchetLift.platformStops.length - 1 : 0;
+  const waterElevator = definition.waterElevator;
   return {
     level,
     cat: { ...definition.cat, vx: 0, vy: 0 },
@@ -583,6 +642,10 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     ratchetStage,
     ratchetDirection: -1,
     ratchetEverActivated: false,
+    waterSurfaceY: waterElevator?.initialWaterY ?? 0,
+    waterPlatformY: waterElevator?.initialWaterY ?? 0,
+    waterFilling: false,
+    waterValveEverActivated: false,
     goalHold: 0,
   };
 }
@@ -657,6 +720,23 @@ function activateRatchetLift(world: PhysicsState, dirX: number, dirY: number) {
   return true;
 }
 
+function activateWaterValve(world: PhysicsState, dirX: number, dirY: number) {
+  const elevator = LEVELS[world.level].waterElevator;
+  if (!elevator) return false;
+
+  const toValveX = elevator.valveX - world.cat.x;
+  const toValveY = elevator.valveY - world.cat.y;
+  const distance = Math.hypot(toValveX, toValveY);
+  const coneDot = distance > 0
+    ? (toValveX * dirX + toValveY * dirY) / distance
+    : -1;
+  if (distance >= 145 || coneDot < 0.86) return false;
+
+  world.waterFilling = !world.waterFilling;
+  world.waterValveEverActivated = true;
+  return true;
+}
+
 export function applySneeze(
   world: PhysicsState,
   dirX: number,
@@ -665,6 +745,7 @@ export function applySneeze(
 ) {
   const velocity = sneezeVelocity(dirX, dirY, power);
   const ratchetActivated = activateRatchetLift(world, dirX, dirY);
+  const waterValveActivated = activateWaterValve(world, dirX, dirY);
   const recoilScale = world.ropeAttached === null ? 1 : ROPE_SNEEZE_SCALE;
   world.cat.vx += velocity.vx * recoilScale;
   world.cat.vy += velocity.vy * recoilScale;
@@ -715,7 +796,7 @@ export function applySneeze(
     }
   }
 
-  return movedObject || ratchetActivated;
+  return movedObject || ratchetActivated || waterValveActivated;
 }
 
 function collideWithFloorAndWalls(
@@ -1150,6 +1231,41 @@ function stepRatchetLift(world: PhysicsState, dt: number) {
   if (world.box) resolveBodyObstacle(world.box, BOX_HALF, platform);
 }
 
+function moveWaterElevatorAndCarry(world: PhysicsState, dt: number) {
+  const elevator = LEVELS[world.level].waterElevator;
+  if (!elevator) return;
+
+  const previousPlatform = {
+    x: elevator.platformX,
+    y: world.waterPlatformY,
+    width: elevator.platformWidth,
+    height: elevator.platformHeight,
+  };
+  const catRides = bodyStandingOnPlatform(world.cat, CAT_R, previousPlatform);
+  const targetY = world.waterFilling ? elevator.highWaterY : elevator.lowWaterY;
+  world.waterSurfaceY = approach(world.waterSurfaceY, targetY, elevator.waterSpeed * dt);
+  world.waterPlatformY = world.waterSurfaceY;
+
+  if (catRides) world.cat.y += world.waterPlatformY - previousPlatform.y;
+}
+
+function stepWaterElevator(world: PhysicsState, dt: number) {
+  const elevator = LEVELS[world.level].waterElevator;
+  if (!elevator) return;
+
+  const platform = {
+    x: elevator.platformX,
+    y: world.waterPlatformY,
+    width: elevator.platformWidth,
+    height: elevator.platformHeight,
+  };
+  const catOnPlatform = resolveBodyObstacle(world.cat, CAT_R, platform);
+  if (catOnPlatform) {
+    world.cat.vx = applyGroundFriction(world.cat.vx, dt);
+    world.cat.vy = Math.min(world.cat.vy, 0);
+  }
+}
+
 function movePlatformsAndCarry(world: PhysicsState, dt: number) {
   const previousPositions = world.platformPositions;
   const catRides = previousPositions.map(
@@ -1283,6 +1399,7 @@ export function releaseRope(world: PhysicsState) {
 export function stepPhysics(world: PhysicsState, dt: number) {
   movePlatformsAndCarry(world, dt);
   moveWeightedLiftAndCarry(world, dt);
+  moveWaterElevatorAndCarry(world, dt);
   world.updraftTimeRemaining = Math.max(0, world.updraftTimeRemaining - dt);
   const updraft = LEVELS[world.level].updraft;
   const catInUpdraft = Boolean(
@@ -1342,6 +1459,7 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   stepMovingPlatforms(world, dt);
   stepWeightedLift(world, dt);
   stepRatchetLift(world, dt);
+  stepWaterElevator(world, dt);
   stepRopes(world, dt);
 
   const goalUnlocked = (
@@ -1357,6 +1475,10 @@ export function stepPhysics(world: PhysicsState, dt: number) {
     (world.level !== 14 || (
       world.ratchetEverActivated &&
       world.ratchetStage === 0
+    )) &&
+    (world.level !== 15 || (
+      world.waterValveEverActivated &&
+      world.waterSurfaceY <= LEVELS[15].waterElevator!.highWaterY + 0.5
     )) &&
     isSeesawReady(world)
   );

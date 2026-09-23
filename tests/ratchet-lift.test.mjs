@@ -41,7 +41,8 @@ test("Level 14 starts at the lower stop and follows Level 13", () => {
 
   assert.ok(lift);
   assert.equal(nextLevel(13), 14);
-  assert.equal(nextLevel(14), null);
+  assert.equal(nextLevel(14), 15);
+  assert.equal(nextLevel(15), null);
   assert.deepEqual(lift.platformStops, [325, 365, 405, 445]);
   assert.deepEqual(world.cat, { x: 110, y: 420, vx: 0, vy: 0 });
   assert.equal(world.ratchetStage, lift.platformStops.length - 1);

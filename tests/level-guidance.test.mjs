@@ -112,5 +112,5 @@ test("level thirteen explains the weighted lift, box loading, and landing route"
 });
 
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*つぎはロープにつかまろう[\s\S]*つぎは上昇気流シャフトへ[\s\S]*つぎはおもり式リフトへ[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*つぎはロープにつかまろう[\s\S]*つぎは上昇気流シャフトへ[\s\S]*つぎはおもり式リフトへ[\s\S]*つぎはラチェット式昇降台へ[\s\S]*つぎは水位エレベーターへ[\s\S]*全レベル クリア！/);
 });
