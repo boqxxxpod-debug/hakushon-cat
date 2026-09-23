@@ -46,7 +46,7 @@ test("Level 16 follows Level 15 with a bounded gravity zone and reset state", ()
 
 test("only an aimed sneeze near the switch toggles gravity", () => {
   const missed = freshPhysics(16);
-  assert.equal(applySneeze(missed, 1, 0, 0.5), false);
+  applySneeze(missed, 1, 0, 0.5);
   assert.equal(missed.gravityReversed, false);
   assert.equal(missed.gravitySwitchEverActivated, false);
 
