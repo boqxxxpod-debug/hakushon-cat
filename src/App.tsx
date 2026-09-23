@@ -252,6 +252,9 @@ export default function Home() {
       const world = physicsRef.current;
       const definition = LEVELS[world.level];
       const weightedLift = definition.weightedLift;
+      const ratchetLift = definition.ratchetLift;
+      const ratchetStopCount = ratchetLift?.platformStops.length ?? 0;
+      const ratchetAtTop = world.ratchetStage === 0;
       const liftBasketBaseY = weightedLift
         ? weightedLift.basketBaseYAtBottom + (weightedLift.platformBottomY - world.liftPlatformY)
         : 0;
@@ -265,7 +268,8 @@ export default function Home() {
         (world.level === 9 && !world.wallBroken.every(Boolean)) ||
         (world.level === 11 && (!world.ropeEverGrabbed || world.ropeAttached !== null)) ||
         (world.level === 12 && !world.updraftEverActivated) ||
-        (world.level === 13 && (!world.liftBoxLoaded || !liftAtTop))
+        (world.level === 13 && (!world.liftBoxLoaded || !liftAtTop)) ||
+        (world.level === 14 && (!world.ratchetEverActivated || !ratchetAtTop))
       );
       const goalLockLabel = world.level === 6
         ? "スイッチ待ち"
@@ -279,7 +283,11 @@ export default function Home() {
                 ? "送風機待ち"
                 : world.level === 13
                   ? (world.liftBoxLoaded ? "リフト上昇中" : "箱をカゴへ")
-                  : "ふうせん待ち";
+                  : world.level === 14
+                    ? (world.ratchetEverActivated
+                        ? (world.ratchetDirection === -1 ? "リフト上昇中" : "リフト下降中")
+                        : "ハンドル待ち")
+                    : "ふうせん待ち";
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
       const background = ctx.createLinearGradient(0, 0, 0, WORLD_H);
@@ -748,6 +756,85 @@ export default function Home() {
         ctx.restore();
       }
 
+      if (ratchetLift) {
+        const stageNumber = ratchetStopCount - world.ratchetStage;
+        const platformY = world.ratchetPlatformY;
+        ctx.save();
+        ctx.strokeStyle = "rgba(62, 75, 102, .4)";
+        ctx.lineWidth = 4;
+        for (const railX of [ratchetLift.platformX + 9, ratchetLift.platformX + ratchetLift.platformWidth - 9]) {
+          ctx.beginPath();
+          ctx.moveTo(railX, ratchetLift.platformStops[0] + ratchetLift.platformHeight / 2);
+          ctx.lineTo(
+            railX,
+            ratchetLift.platformStops[ratchetStopCount - 1] + ratchetLift.platformHeight / 2,
+          );
+          ctx.stroke();
+          ratchetLift.platformStops.forEach((stopY, index) => {
+            ctx.beginPath();
+            ctx.moveTo(railX - 7, stopY + ratchetLift.platformHeight / 2);
+            ctx.lineTo(railX + 7, stopY + ratchetLift.platformHeight / 2);
+            ctx.strokeStyle = index === world.ratchetStage ? "#f2b94b" : "rgba(62, 75, 102, .38)";
+            ctx.lineWidth = index === world.ratchetStage ? 5 : 3;
+            ctx.stroke();
+          });
+        }
+
+        roundedRect(
+          ctx,
+          ratchetLift.platformX,
+          platformY,
+          ratchetLift.platformWidth,
+          ratchetLift.platformHeight,
+          7,
+        );
+        ctx.fillStyle = "#60b8d8";
+        ctx.fill();
+        ctx.strokeStyle = "#236e89";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.72)";
+        ctx.fillRect(ratchetLift.platformX + 10, platformY + 4, ratchetLift.platformWidth - 20, 3);
+
+        ctx.strokeStyle = "#76502e";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(ratchetLift.handleX, ratchetLift.handleY + 15);
+        ctx.lineTo(ratchetLift.handleX, FLOOR_Y);
+        ctx.stroke();
+        roundedRect(ctx, ratchetLift.handleX - 18, FLOOR_Y - 8, 36, 12, 5);
+        ctx.fillStyle = "#76502e";
+        ctx.fill();
+        ctx.fillStyle = "rgba(228, 187, 114, .38)";
+        ctx.beginPath();
+        ctx.arc(ratchetLift.handleX, ratchetLift.handleY, ratchetLift.handleRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#684326";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "#9d6538";
+        ctx.beginPath();
+        ctx.arc(ratchetLift.handleX, ratchetLift.handleY, ratchetLift.handleRadius * 0.62, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(ratchetLift.handleX, ratchetLift.handleY);
+        ctx.lineTo(ratchetLift.handleX + 14, ratchetLift.handleY - 10);
+        ctx.stroke();
+        ctx.fillStyle = "#e4bb72";
+        ctx.beginPath();
+        ctx.arc(ratchetLift.handleX + 14, ratchetLift.handleY - 10, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        roundedRect(ctx, 225, 431, 104, 27, 12);
+        ctx.fillStyle = "rgba(255,255,255,.9)";
+        ctx.fill();
+        ctx.fillStyle = "#26334d";
+        ctx.font = "800 12px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(`段 ${stageNumber}/${ratchetStopCount} · ${world.ratchetDirection === -1 ? "↑" : "↓"}`, 277, 445);
+        ctx.restore();
+      }
+
       if (updraft) {
         const blowerOn = world.updraftTimeRemaining > 0;
         ctx.save();
@@ -901,10 +988,11 @@ export default function Home() {
       const showLevelThirteenGuide = world.level === 13 && (
         !world.liftBoxLoaded || !liftAtTop || shotsRef.current < 2
       );
+      const showLevelFourteenGuide = world.level === 14;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide || showLevelTwelveGuide || showLevelThirteenGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide || showLevelTwelveGuide || showLevelThirteenGuide || showLevelFourteenGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -919,9 +1007,10 @@ export default function Home() {
         const isLevelEleven = world.level === 11;
         const isLevelTwelve = world.level === 12;
         const isLevelThirteen = world.level === 13;
+        const isLevelFourteen = world.level === 14;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven || isLevelTwelve || isLevelThirteen ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven || isLevelTwelve || isLevelThirteen || isLevelFourteen ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -1075,6 +1164,23 @@ export default function Home() {
             180,
             187,
           );
+        } else if (isLevelFourteen && ratchetLift) {
+          const stageNumber = ratchetStopCount - world.ratchetStage;
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = ratchetAtTop ? "#28794f" : "#26334d";
+          ctx.fillText(
+            ratchetAtTop ? "③ 上端に到着！" : `① ハンドルへくしゃみ · 段 ${stageNumber}/${ratchetStopCount}`,
+            180,
+            158,
+          );
+          ctx.fillStyle = "#59657c";
+          ctx.fillText(
+            ratchetAtTop
+              ? "左下へ短くくしゃみ → 右のクッション"
+              : `1回で1段${world.ratchetDirection === -1 ? "上昇" : "下降"} · 上端の次は下降`,
+            180,
+            187,
+          );
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -1201,7 +1307,9 @@ export default function Home() {
                                     ? "左下へ長くドラッグしてロープへ飛び、近づくと自動でつかまります。右へ揺れたらネコをタップしてロープを離すか、画面下のボタンで離して高いクッションへ着地しましょう。"
                                     : level === 12
                                       ? "左上向きのくしゃみで送風機を作動し、右向きのくしゃみでシャフトへ。上昇中に右向きのくしゃみで左の出口から出て、クッションに着地しましょう。"
-                                      : "右上向きのくしゃみで箱を右のカゴへ運びます。カゴが下がって昇降台が上端に着いたら、左下向きのくしゃみで右のクッションへ飛びましょう。"
+                                      : level === 13
+                                        ? "右上向きのくしゃみで箱を右のカゴへ運びます。カゴが下がって昇降台が上端に着いたら、左下向きのくしゃみで右のクッションへ飛びましょう。"
+                                        : "ハンドルを狙ってくしゃみをすると一段上がります。上端まで上げ、左下へ短くくしゃみをして壁を越え、右のクッションへ着地しましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -1269,8 +1377,10 @@ export default function Home() {
                                       ? "つぎはロープにつかまろう"
                                       : level === 11
                                         ? "つぎは上昇気流シャフトへ"
-                                        : level === 12
-                                          ? "つぎはおもり式リフトへ"
+                                      : level === 12
+                                        ? "つぎはおもり式リフトへ"
+                                        : level === 13
+                                          ? "つぎはラチェット式昇降台へ"
                                           : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
@@ -1305,7 +1415,9 @@ export default function Home() {
             ? "ネコは歩けません。送風機を作動し、右向きのくしゃみで反動を使って上昇気流へ。上昇中もくしゃみを使えます。"
             : level === 13
               ? "ネコは歩けません。箱をカゴに入れると反対側の昇降台が上がります。台が上端に着いたら右へ飛びましょう。"
-              : "ネコは歩けません。くしゃみの向きと逆へ飛びます。"}
+              : level === 14
+                ? "ハンドルへのくしゃみ1回で一段進みます。上端で下降に切り替わるので、四段目で止めて左下へ短くくしゃみし、壁を越えましょう。"
+                : "ネコは歩けません。くしゃみの向きと逆へ飛びます。"}
         </p>
       </div>
     </main>

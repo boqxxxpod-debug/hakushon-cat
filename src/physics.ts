@@ -11,7 +11,7 @@ export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 export const ROPE_SNEEZE_SCALE = 0.45;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
 
 export type Obstacle = {
   x: number;
@@ -93,6 +93,17 @@ export type WeightedLift = {
   liftSpeed: number;
 };
 
+export type RatchetLift = {
+  platformX: number;
+  platformWidth: number;
+  platformHeight: number;
+  /** Fixed stops ordered from the uppermost position to the lowest. */
+  platformStops: number[];
+  handleX: number;
+  handleY: number;
+  handleRadius: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -110,6 +121,7 @@ export type LevelDefinition = {
   ropes: Rope[];
   updraft?: Updraft;
   weightedLift?: WeightedLift;
+  ratchetLift?: RatchetLift;
   hint: string;
 };
 
@@ -156,6 +168,10 @@ export type PhysicsState = {
   liftPlatformY: number;
   liftBoxLoaded: boolean;
   liftEverLoaded: boolean;
+  ratchetPlatformY: number;
+  ratchetStage: number;
+  ratchetDirection: -1 | 1;
+  ratchetEverActivated: boolean;
   goalHold: number;
 };
 
@@ -454,6 +470,35 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     },
     hint: "箱をおもりカゴへ運べ！",
   },
+  14: {
+    id: 14,
+    cat: { x: 110, y: 420 },
+    box: null,
+    balloon: null,
+    goal: { left: 224, right: 318, top: 344, bottom: 369 },
+    obstacles: [
+      { x: 190, y: 325, width: 14, height: 55 },
+      { x: 205, y: 380, width: 137, height: 18 },
+    ],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [],
+    movingPlatforms: [],
+    ropes: [],
+    ratchetLift: {
+      platformX: 50,
+      platformWidth: 120,
+      platformHeight: 14,
+      platformStops: [325, 365, 405, 445],
+      handleX: 110,
+      handleY: 477,
+      handleRadius: 24,
+    },
+    hint: "ハンドルで一段ずつ！",
+  },
 };
 
 export function nextLevel(level: LevelId): LevelId | null {
@@ -469,6 +514,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 10) return 11;
   if (level === 11) return 12;
   if (level === 12) return 13;
+  if (level === 13) return 14;
   return null;
 }
 
@@ -495,6 +541,8 @@ export function ropeEndPosition(world: PhysicsState, index: number) {
 
 export function freshPhysics(level: LevelId = 1): PhysicsState {
   const definition = LEVELS[level];
+  const ratchetLift = definition.ratchetLift;
+  const ratchetStage = ratchetLift ? ratchetLift.platformStops.length - 1 : 0;
   return {
     level,
     cat: { ...definition.cat, vx: 0, vy: 0 },
@@ -531,6 +579,10 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     liftPlatformY: definition.weightedLift?.platformBottomY ?? 0,
     liftBoxLoaded: false,
     liftEverLoaded: false,
+    ratchetPlatformY: ratchetLift?.platformStops[ratchetStage] ?? 0,
+    ratchetStage,
+    ratchetDirection: -1,
+    ratchetEverActivated: false,
     goalHold: 0,
   };
 }
@@ -564,6 +616,47 @@ export function sneezeVelocity(dirX: number, dirY: number, power: number) {
   };
 }
 
+function activateRatchetLift(world: PhysicsState, dirX: number, dirY: number) {
+  const lift = LEVELS[world.level].ratchetLift;
+  if (!lift || lift.platformStops.length < 2) return false;
+
+  const toHandleX = lift.handleX - world.cat.x;
+  const toHandleY = lift.handleY - world.cat.y;
+  const handleDistance = Math.hypot(toHandleX, toHandleY);
+  const coneDot = handleDistance > 0
+    ? (toHandleX * dirX + toHandleY * dirY) / handleDistance
+    : -1;
+  if (handleDistance >= 180 || coneDot < 0.86) return false;
+
+  const currentStage = clamp(world.ratchetStage, 0, lift.platformStops.length - 1);
+  const currentPlatform = {
+    x: lift.platformX,
+    y: world.ratchetPlatformY,
+    width: lift.platformWidth,
+    height: lift.platformHeight,
+  };
+  const catRides = bodyStandingOnPlatform(world.cat, CAT_R, currentPlatform);
+  let direction = world.ratchetDirection;
+  let nextStage = currentStage + direction;
+  if (nextStage < 0 || nextStage >= lift.platformStops.length) {
+    direction = direction === -1 ? 1 : -1;
+    nextStage = currentStage + direction;
+  }
+
+  const nextPlatformY = lift.platformStops[nextStage];
+  if (nextPlatformY === undefined) return false;
+  if (catRides) world.cat.y += nextPlatformY - world.ratchetPlatformY;
+  world.ratchetStage = nextStage;
+  world.ratchetPlatformY = nextPlatformY;
+  world.ratchetDirection = nextStage === 0
+    ? 1
+    : nextStage === lift.platformStops.length - 1
+      ? -1
+      : direction;
+  world.ratchetEverActivated = true;
+  return true;
+}
+
 export function applySneeze(
   world: PhysicsState,
   dirX: number,
@@ -571,6 +664,7 @@ export function applySneeze(
   power: number,
 ) {
   const velocity = sneezeVelocity(dirX, dirY, power);
+  const ratchetActivated = activateRatchetLift(world, dirX, dirY);
   const recoilScale = world.ropeAttached === null ? 1 : ROPE_SNEEZE_SCALE;
   world.cat.vx += velocity.vx * recoilScale;
   world.cat.vy += velocity.vy * recoilScale;
@@ -621,7 +715,7 @@ export function applySneeze(
     }
   }
 
-  return movedObject;
+  return movedObject || ratchetActivated;
 }
 
 function collideWithFloorAndWalls(
@@ -1041,6 +1135,21 @@ function stepWeightedLift(world: PhysicsState, dt: number) {
   }
 }
 
+function stepRatchetLift(world: PhysicsState, dt: number) {
+  const lift = LEVELS[world.level].ratchetLift;
+  if (!lift) return;
+
+  const platform = {
+    x: lift.platformX,
+    y: world.ratchetPlatformY,
+    width: lift.platformWidth,
+    height: lift.platformHeight,
+  };
+  const catOnPlatform = resolveBodyObstacle(world.cat, CAT_R, platform);
+  if (catOnPlatform) world.cat.vx = approach(world.cat.vx, 0, 420 * dt);
+  if (world.box) resolveBodyObstacle(world.box, BOX_HALF, platform);
+}
+
 function movePlatformsAndCarry(world: PhysicsState, dt: number) {
   const previousPositions = world.platformPositions;
   const catRides = previousPositions.map(
@@ -1232,6 +1341,7 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   stepSeesaws(world, dt);
   stepMovingPlatforms(world, dt);
   stepWeightedLift(world, dt);
+  stepRatchetLift(world, dt);
   stepRopes(world, dt);
 
   const goalUnlocked = (
@@ -1243,6 +1353,10 @@ export function stepPhysics(world: PhysicsState, dt: number) {
     (world.level !== 13 || (
       world.liftBoxLoaded &&
       world.liftPlatformY <= LEVELS[13].weightedLift!.platformTopY + 0.5
+    )) &&
+    (world.level !== 14 || (
+      world.ratchetEverActivated &&
+      world.ratchetStage === 0
     )) &&
     isSeesawReady(world)
   );

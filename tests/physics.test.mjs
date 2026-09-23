@@ -191,7 +191,7 @@ test("level four uses its spring to reach the raised cushion", () => {
   assert.ok(world.goalHold >= 0.6, "the spring route should end on the raised cushion");
 });
 
-test("level progression reaches level thirteen and restart preserves the current level", () => {
+test("level progression reaches level fourteen and restart preserves the current level", () => {
   assert.equal(nextLevel(1), 2);
   assert.equal(nextLevel(2), 3);
   assert.equal(nextLevel(3), 4);
@@ -204,7 +204,8 @@ test("level progression reaches level thirteen and restart preserves the current
   assert.equal(nextLevel(10), 11);
   assert.equal(nextLevel(11), 12);
   assert.equal(nextLevel(12), 13);
-  assert.equal(nextLevel(13), null);
+  assert.equal(nextLevel(13), 14);
+  assert.equal(nextLevel(14), null);
   assert.deepEqual(freshPhysics(nextLevel(1)), freshPhysics(2));
   assert.deepEqual(freshPhysics(nextLevel(2)), freshPhysics(3));
   assert.deepEqual(freshPhysics(nextLevel(3)), freshPhysics(4));
@@ -217,6 +218,7 @@ test("level progression reaches level thirteen and restart preserves the current
   assert.deepEqual(freshPhysics(nextLevel(10)), freshPhysics(11));
   assert.deepEqual(freshPhysics(nextLevel(11)), freshPhysics(12));
   assert.deepEqual(freshPhysics(nextLevel(12)), freshPhysics(13));
+  assert.deepEqual(freshPhysics(nextLevel(13)), freshPhysics(14));
   assert.deepEqual(freshPhysics(2), freshPhysics(2));
   assert.deepEqual(freshPhysics(3), freshPhysics(3));
   assert.deepEqual(freshPhysics(4), freshPhysics(4));
@@ -229,6 +231,7 @@ test("level progression reaches level thirteen and restart preserves the current
   assert.deepEqual(freshPhysics(11), freshPhysics(11));
   assert.deepEqual(freshPhysics(12), freshPhysics(12));
   assert.deepEqual(freshPhysics(13), freshPhysics(13));
+  assert.deepEqual(freshPhysics(14), freshPhysics(14));
 });
 
 test("level five balloon responds farther than a box to the same wind", () => {
