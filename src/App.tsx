@@ -704,6 +704,17 @@ export default function Home() {
       }
       ctx.restore();
 
+      if (world.ropeAttached !== null) {
+        ctx.save();
+        ctx.strokeStyle = "#28794f";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath();
+        ctx.arc(world.cat.x, world.cat.y, 47, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       drawAim(world);
 
       const showLevelOneGuide = world.level === 1 && shotsRef.current < 2;
@@ -850,7 +861,7 @@ export default function Home() {
           );
           ctx.fillStyle = "#26334d";
           ctx.fillText(
-            holdingRope ? "② 左へ長く → 右でボタン" : "近づくと自動でつかまる！",
+            holdingRope ? "② ネコをタップしてはなす" : "近づくと自動でつかまる！",
             180,
             187,
           );
@@ -894,10 +905,15 @@ export default function Home() {
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
-    if (statusRef.current !== "playing" || performance.now() < cooldownUntilRef.current) return;
+    if (statusRef.current !== "playing") return;
     const point = pointerPosition(event);
     const cat = physicsRef.current.cat;
     if (Math.hypot(point.x - cat.x, point.y - cat.y) > 48) return;
+    if (levelRef.current === 11 && physicsRef.current.ropeAttached !== null) {
+      handleReleaseRope();
+      return;
+    }
+    if (performance.now() < cooldownUntilRef.current) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     aimRef.current = { active: true, pointerId: event.pointerId, x: point.x, y: point.y };
   };
@@ -971,7 +987,7 @@ export default function Home() {
                                 ? "右へ長くドラッグし、箱を十分に加速して壁へぶつけます。壁が壊れたら左下へ長くドラッグし、反動で開いた通路を抜けましょう。"
                                 : level === 10
                                   ? "ネコは水色の足場に乗ったまま運ばれます。足場が右端へ近づいた瞬間に左下へ短くドラッグし、反動で右上のクッションへ着地しましょう。"
-                                  : "左下へ長くドラッグしてロープへ飛び、近づくと自動でつかまります。くしゃみの反動で右へ揺れ、ロープをはなすボタンで高いクッションへ着地しましょう。"
+                                  : "左下へ長くドラッグしてロープへ飛び、近づくと自動でつかまります。右へ揺れたらネコをタップしてロープを離すか、画面下のボタンで離して高いクッションへ着地しましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -992,7 +1008,7 @@ export default function Home() {
               className="rope-release-button"
               type="button"
               onClick={handleReleaseRope}
-              aria-label="ロープをはなして、そのままの勢いで飛ぶ"
+              aria-label="ロープをはなして、そのままの勢いで飛ぶ。ネコのタップでも離せます"
             >
               ロープをはなす
               <span aria-hidden="true">→</span>
@@ -1004,7 +1020,7 @@ export default function Home() {
               : status === "failed"
                 ? "失敗。もう一度挑戦できます。"
                 : ropeAttached
-                  ? "ロープをつかみました。右へ揺れたらロープをはなせます。"
+                  ? "ロープをつかみました。ネコをタップするか、画面下のボタンでロープをはなして飛べます。"
                   : ""}
           </div>
           {status === "won" ? (

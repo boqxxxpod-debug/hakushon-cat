@@ -87,8 +87,8 @@ test("level eleven explains automatic rope grab, swing boost, and release", () =
   assert.match(appSource, /① 左下へ長く → ロープへ/);
   assert.match(appSource, /近づくと自動でつかまる！/);
   assert.match(appSource, /ロープをつかんだ！/);
-  assert.match(appSource, /② 左へ長く → 右でボタン/);
-  assert.match(appSource, /左下へ長くドラッグしてロープへ飛び[\s\S]*ロープをはなすボタンで高いクッションへ着地/);
+  assert.match(appSource, /② ネコをタップしてはなす/);
+  assert.match(appSource, /左下へ長くドラッグしてロープへ飛び[\s\S]*ネコをタップしてロープを離すか、画面下のボタンで離して高いクッションへ着地/);
 });
 
 test("the clear messages lead into the next stage before final completion", () => {
