@@ -91,6 +91,15 @@ test("level eleven explains automatic rope grab, swing boost, and release", () =
   assert.match(appSource, /左下へ長くドラッグしてロープへ飛び[\s\S]*ネコをタップしてロープを離すか、画面下のボタンで離して高いクッションへ着地/);
 });
 
+test("level twelve explains how to activate, enter, and exit the updraft shaft", () => {
+  assert.match(appSource, /world\.level === 12 && \([\s\S]*!world\.updraftEverActivated/);
+  assert.match(appSource, /① 左上へ → 送風機ON/);
+  assert.match(appSource, /② 右へくしゃみ → シャフトへ/);
+  assert.match(appSource, /右へくしゃみ → 左の出口へ/);
+  assert.match(appSource, /送風機を作動し、右向きのくしゃみで反動を使って上昇気流へ[\s\S]*上昇中もくしゃみを使えます/);
+  assert.match(appSource, /上昇中に右向きのくしゃみで左の出口から出て[\s\S]*クッションに着地/);
+});
+
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*つぎはロープにつかまろう[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*つぎはロープにつかまろう[\s\S]*つぎは上昇気流シャフトへ[\s\S]*全レベル クリア！/);
 });
