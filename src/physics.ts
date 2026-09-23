@@ -11,7 +11,7 @@ export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 export const ROPE_SNEEZE_SCALE = 0.45;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 
 export type Obstacle = {
   x: number;
@@ -79,6 +79,20 @@ export type Updraft = {
   liftAcceleration: number;
 };
 
+export type WeightedLift = {
+  platformX: number;
+  platformWidth: number;
+  platformHeight: number;
+  platformTopY: number;
+  platformBottomY: number;
+  basketX: number;
+  basketWidth: number;
+  basketHeight: number;
+  basketBaseYAtBottom: number;
+  basketWallWidth: number;
+  liftSpeed: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -95,6 +109,7 @@ export type LevelDefinition = {
   movingPlatforms: MovingPlatform[];
   ropes: Rope[];
   updraft?: Updraft;
+  weightedLift?: WeightedLift;
   hint: string;
 };
 
@@ -138,6 +153,9 @@ export type PhysicsState = {
   ropeEverGrabbed: boolean;
   updraftTimeRemaining: number;
   updraftEverActivated: boolean;
+  liftPlatformY: number;
+  liftBoxLoaded: boolean;
+  liftEverLoaded: boolean;
   goalHold: number;
 };
 
@@ -403,6 +421,39 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     },
     hint: "送風機で上昇気流を起こせ！",
   },
+  13: {
+    id: 13,
+    cat: { x: 92, y: 425 },
+    box: { x: 100, y: 339 },
+    balloon: null,
+    goal: { left: 160, right: 235, top: 245, bottom: 270 },
+    obstacles: [
+      { x: 80, y: 360, width: 55, height: 14 },
+      { x: 150, y: 285, width: 178, height: 14 },
+    ],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [],
+    movingPlatforms: [],
+    ropes: [],
+    weightedLift: {
+      platformX: 40,
+      platformWidth: 110,
+      platformHeight: 14,
+      platformTopY: 285,
+      platformBottomY: 450,
+      basketX: 135,
+      basketWidth: 110,
+      basketHeight: 16,
+      basketBaseYAtBottom: 360,
+      basketWallWidth: 8,
+      liftSpeed: 70,
+    },
+    hint: "箱をおもりカゴへ運べ！",
+  },
 };
 
 export function nextLevel(level: LevelId): LevelId | null {
@@ -417,6 +468,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 9) return 10;
   if (level === 10) return 11;
   if (level === 11) return 12;
+  if (level === 12) return 13;
   return null;
 }
 
@@ -476,6 +528,9 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     ropeEverGrabbed: false,
     updraftTimeRemaining: 0,
     updraftEverActivated: false,
+    liftPlatformY: definition.weightedLift?.platformBottomY ?? 0,
+    liftBoxLoaded: false,
+    liftEverLoaded: false,
     goalHold: 0,
   };
 }
@@ -891,6 +946,101 @@ function bodyStandingOnPlatform(body: Body, radius: number, platform: Obstacle) 
   );
 }
 
+function weightedLiftBasketBaseY(lift: WeightedLift, platformY: number) {
+  return lift.basketBaseYAtBottom + (lift.platformBottomY - platformY);
+}
+
+function moveWeightedLiftAndCarry(world: PhysicsState, dt: number) {
+  const lift = LEVELS[world.level].weightedLift;
+  if (!lift) return;
+
+  const previousPlatform = {
+    x: lift.platformX,
+    y: world.liftPlatformY,
+    width: lift.platformWidth,
+    height: lift.platformHeight,
+  };
+  const previousBasketBaseY = weightedLiftBasketBaseY(lift, world.liftPlatformY);
+  const catRides = bodyStandingOnPlatform(world.cat, CAT_R, previousPlatform);
+  const boxRides = Boolean(
+    world.box &&
+    world.liftBoxLoaded &&
+    Math.abs(world.box.y + BOX_HALF - previousBasketBaseY) <= 4 &&
+    Math.abs(world.box.vy) <= 30,
+  );
+  const targetY = world.liftBoxLoaded ? lift.platformTopY : lift.platformBottomY;
+  world.liftPlatformY = approach(world.liftPlatformY, targetY, lift.liftSpeed * dt);
+
+  const platformDelta = world.liftPlatformY - previousPlatform.y;
+  if (catRides) world.cat.y += platformDelta;
+  if (boxRides && world.box) world.box.y -= platformDelta;
+}
+
+function stepWeightedLift(world: PhysicsState, dt: number) {
+  const lift = LEVELS[world.level].weightedLift;
+  if (!lift) return;
+
+  const platform = {
+    x: lift.platformX,
+    y: world.liftPlatformY,
+    width: lift.platformWidth,
+    height: lift.platformHeight,
+  };
+  const catOnPlatform = resolveBodyObstacle(world.cat, CAT_R, platform);
+  if (catOnPlatform) world.cat.vx = approach(world.cat.vx, 0, 420 * dt);
+
+  const box = world.box;
+  if (!box) return;
+
+  const basketBaseY = weightedLiftBasketBaseY(lift, world.liftPlatformY);
+  const base = {
+    x: lift.basketX,
+    y: basketBaseY,
+    width: lift.basketWidth,
+    height: 10,
+  };
+  const rightWall = {
+    x: lift.basketX + lift.basketWidth - lift.basketWallWidth,
+    y: basketBaseY - lift.basketHeight,
+    width: lift.basketWallWidth,
+    height: lift.basketHeight,
+  };
+  resolveBodyObstacle(box, BOX_HALF, rightWall);
+  const boxOnBasket = resolveBodyObstacle(box, BOX_HALF, base);
+  const rightWallInnerEdge = rightWall.x - BOX_HALF;
+  const insideBasket = (
+    box.x >= lift.basketX + BOX_HALF &&
+    box.x <= rightWallInnerEdge &&
+    box.y + BOX_HALF >= basketBaseY - lift.basketHeight - 3 &&
+    box.y - BOX_HALF <= basketBaseY + 3
+  );
+
+  if (world.liftBoxLoaded && !insideBasket) {
+    world.liftBoxLoaded = false;
+  }
+
+  if (
+    !world.liftBoxLoaded &&
+    insideBasket &&
+    (boxOnBasket || (box.vy >= -20 && Math.abs(box.y + BOX_HALF - basketBaseY) <= 3))
+  ) {
+    world.liftBoxLoaded = true;
+    world.liftEverLoaded = true;
+    box.x = (lift.basketX + BOX_HALF + rightWallInnerEdge) / 2;
+    box.y = basketBaseY - BOX_HALF;
+    box.vx = 0;
+    box.vy = 0;
+  }
+
+  if (world.liftBoxLoaded && insideBasket) {
+    if (box.y + BOX_HALF >= basketBaseY - 3 && box.vy > 0) {
+      box.y = basketBaseY - BOX_HALF;
+      box.vy = 0;
+      box.vx = approach(box.vx, 0, 820 * dt);
+    }
+  }
+}
+
 function movePlatformsAndCarry(world: PhysicsState, dt: number) {
   const previousPositions = world.platformPositions;
   const catRides = previousPositions.map(
@@ -1023,6 +1173,7 @@ export function releaseRope(world: PhysicsState) {
 
 export function stepPhysics(world: PhysicsState, dt: number) {
   movePlatformsAndCarry(world, dt);
+  moveWeightedLiftAndCarry(world, dt);
   world.updraftTimeRemaining = Math.max(0, world.updraftTimeRemaining - dt);
   const updraft = LEVELS[world.level].updraft;
   const catInUpdraft = Boolean(
@@ -1080,6 +1231,7 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   stepBreakableWalls(world);
   stepSeesaws(world, dt);
   stepMovingPlatforms(world, dt);
+  stepWeightedLift(world, dt);
   stepRopes(world, dt);
 
   const goalUnlocked = (
@@ -1088,6 +1240,10 @@ export function stepPhysics(world: PhysicsState, dt: number) {
     (world.level !== 9 || world.wallBroken.every(Boolean)) &&
     (world.level !== 11 || (world.ropeEverGrabbed && world.ropeAttached === null)) &&
     (world.level !== 12 || world.updraftEverActivated) &&
+    (world.level !== 13 || (
+      world.liftBoxLoaded &&
+      world.liftPlatformY <= LEVELS[13].weightedLift!.platformTopY + 0.5
+    )) &&
     isSeesawReady(world)
   );
   const restingOnCushion = goalUnlocked && isRestingOnCushion(world.cat, world.level);

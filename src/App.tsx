@@ -251,14 +251,35 @@ export default function Home() {
     const draw = () => {
       const world = physicsRef.current;
       const definition = LEVELS[world.level];
+      const weightedLift = definition.weightedLift;
+      const liftBasketBaseY = weightedLift
+        ? weightedLift.basketBaseYAtBottom + (weightedLift.platformBottomY - world.liftPlatformY)
+        : 0;
+      const liftAtTop = Boolean(
+        weightedLift && world.liftPlatformY <= weightedLift.platformTopY + 0.5,
+      );
       const goalLocked = (
         (world.level === 5 && !world.balloonCleared) ||
         (world.level === 6 && !world.switchOn.every(Boolean)) ||
         (world.level === 8 && !isSeesawReady(world)) ||
         (world.level === 9 && !world.wallBroken.every(Boolean)) ||
         (world.level === 11 && (!world.ropeEverGrabbed || world.ropeAttached !== null)) ||
-        (world.level === 12 && !world.updraftEverActivated)
+        (world.level === 12 && !world.updraftEverActivated) ||
+        (world.level === 13 && (!world.liftBoxLoaded || !liftAtTop))
       );
+      const goalLockLabel = world.level === 6
+        ? "スイッチ待ち"
+        : world.level === 8
+          ? "かたむき待ち"
+          : world.level === 9
+            ? "カベ待ち"
+            : world.level === 11
+              ? (world.ropeAttached !== null ? "はなして着地" : "ロープ待ち")
+              : world.level === 12
+                ? "送風機待ち"
+                : world.level === 13
+                  ? (world.liftBoxLoaded ? "リフト上昇中" : "箱をカゴへ")
+                  : "ふうせん待ち";
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
       const background = ctx.createLinearGradient(0, 0, 0, WORLD_H);
@@ -625,19 +646,7 @@ export default function Home() {
       ctx.font = "800 11px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(
-        goalLocked
-          ? (world.level === 6
-              ? "スイッチ待ち"
-              : world.level === 8
-                ? "かたむき待ち"
-                : world.level === 9
-                  ? "カベ待ち"
-                  : world.level === 11
-                    ? (world.ropeAttached !== null ? "はなして着地" : "ロープ待ち")
-                    : world.level === 12
-                      ? "送風機待ち"
-                  : "ふうせん待ち")
-          : "おひるね",
+        goalLocked ? goalLockLabel : "おひるね",
         goalX + goalWidth / 2,
         goalY + 16,
       );
@@ -652,6 +661,91 @@ export default function Home() {
         ctx.fillStyle = "rgba(255,255,255,.22)";
         roundedRect(ctx, obstacle.x + 7, obstacle.y + 9, 7, obstacle.height - 18, 4);
         ctx.fill();
+      }
+
+      if (weightedLift) {
+        const basketTopY = liftBasketBaseY - weightedLift.basketHeight;
+        const pulleyX = 184;
+        const pulleyY = 246;
+
+        ctx.save();
+        ctx.strokeStyle = "rgba(75, 84, 104, .35)";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([7, 8]);
+        ctx.beginPath();
+        ctx.moveTo(weightedLift.platformX + 10, weightedLift.platformTopY + weightedLift.platformHeight / 2);
+        ctx.lineTo(weightedLift.platformX + 10, weightedLift.platformBottomY + weightedLift.platformHeight / 2);
+        ctx.moveTo(weightedLift.platformX + weightedLift.platformWidth - 10, weightedLift.platformTopY + weightedLift.platformHeight / 2);
+        ctx.lineTo(weightedLift.platformX + weightedLift.platformWidth - 10, weightedLift.platformBottomY + weightedLift.platformHeight / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = "#76502e";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(weightedLift.platformX + weightedLift.platformWidth - 6, world.liftPlatformY + weightedLift.platformHeight / 2);
+        ctx.lineTo(pulleyX, pulleyY);
+        ctx.lineTo(weightedLift.basketX + weightedLift.basketWidth / 2, basketTopY + 8);
+        ctx.stroke();
+
+        ctx.fillStyle = "#5e667b";
+        ctx.beginPath();
+        ctx.arc(pulleyX, pulleyY, 16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#28344f";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "#c5ccda";
+        ctx.beginPath();
+        ctx.arc(pulleyX, pulleyY, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        roundedRect(
+          ctx,
+          weightedLift.platformX,
+          world.liftPlatformY,
+          weightedLift.platformWidth,
+          weightedLift.platformHeight,
+          7,
+        );
+        ctx.fillStyle = "#60b8d8";
+        ctx.fill();
+        ctx.strokeStyle = "#236e89";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.7)";
+        ctx.fillRect(weightedLift.platformX + 10, world.liftPlatformY + 4, weightedLift.platformWidth - 20, 3);
+
+        ctx.fillStyle = world.liftBoxLoaded ? "rgba(207, 142, 75, .18)" : "rgba(107, 117, 138, .12)";
+        ctx.fillRect(weightedLift.basketX + 4, basketTopY, weightedLift.basketWidth - 12, weightedLift.basketHeight);
+        ctx.fillStyle = "#9d6538";
+        ctx.fillRect(weightedLift.basketX, liftBasketBaseY, weightedLift.basketWidth, 10);
+        ctx.fillRect(
+          weightedLift.basketX + weightedLift.basketWidth - weightedLift.basketWallWidth,
+          basketTopY,
+          weightedLift.basketWallWidth,
+          weightedLift.basketHeight + 10,
+        );
+        ctx.strokeStyle = "#684326";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(weightedLift.basketX, liftBasketBaseY, weightedLift.basketWidth, 10);
+        ctx.strokeRect(
+          weightedLift.basketX + weightedLift.basketWidth - weightedLift.basketWallWidth,
+          basketTopY,
+          weightedLift.basketWallWidth,
+          weightedLift.basketHeight + 10,
+        );
+        ctx.fillStyle = "#684326";
+        ctx.font = "900 11px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          world.liftBoxLoaded ? "カゴ · 箱あり" : "カゴ · 箱を入れる",
+          weightedLift.basketX + weightedLift.basketWidth + 36,
+          liftBasketBaseY - weightedLift.basketHeight / 2,
+        );
+        ctx.fillStyle = "#236e89";
+        ctx.font = "800 11px system-ui, sans-serif";
+        ctx.fillText("ネコの昇降台", weightedLift.platformX + weightedLift.platformWidth / 2, world.liftPlatformY + 30);
+        ctx.restore();
       }
 
       if (updraft) {
@@ -804,10 +898,13 @@ export default function Home() {
       const showLevelTwelveGuide = world.level === 12 && (
         !world.updraftEverActivated || (!airflowActive && world.cat.y > 260)
       );
+      const showLevelThirteenGuide = world.level === 13 && (
+        !world.liftBoxLoaded || !liftAtTop || shotsRef.current < 2
+      );
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide || showLevelTwelveGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide || showLevelTwelveGuide || showLevelThirteenGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -821,9 +918,10 @@ export default function Home() {
         const isLevelTen = world.level === 10;
         const isLevelEleven = world.level === 11;
         const isLevelTwelve = world.level === 12;
+        const isLevelThirteen = world.level === 13;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven || isLevelTwelve ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven || isLevelTwelve || isLevelThirteen ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -959,6 +1057,24 @@ export default function Home() {
             180,
             187,
           );
+        } else if (isLevelThirteen) {
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = world.liftBoxLoaded ? "#28794f" : "#26334d";
+          ctx.fillText(
+            world.liftBoxLoaded
+              ? (liftAtTop ? "② 昇降台が上がった！" : "カゴが下がって上昇中…")
+              : "① 右上へくしゃみ → 箱をカゴへ",
+            180,
+            158,
+          );
+          ctx.fillStyle = world.liftBoxLoaded ? "#26334d" : "#59657c";
+          ctx.fillText(
+            world.liftBoxLoaded
+              ? (liftAtTop ? "左下へくしゃみ → 右のクッション" : "台が上端に着いたら右へ飛ぼう")
+              : "箱が入るとネコの台が上がる！",
+            180,
+            187,
+          );
         } else {
           ctx.font = "800 17px system-ui, sans-serif";
           ctx.fillText("ネコを押したまま", 180, 157);
@@ -1081,9 +1197,11 @@ export default function Home() {
                                 ? "右へ長くドラッグし、箱を十分に加速して壁へぶつけます。壁が壊れたら左下へ長くドラッグし、反動で開いた通路を抜けましょう。"
                                 : level === 10
                                   ? "ネコは水色の足場に乗ったまま運ばれます。足場が右端へ近づいた瞬間に左下へ短くドラッグし、反動で右上のクッションへ着地しましょう。"
-                                  : level === 11
+                                : level === 11
                                     ? "左下へ長くドラッグしてロープへ飛び、近づくと自動でつかまります。右へ揺れたらネコをタップしてロープを離すか、画面下のボタンで離して高いクッションへ着地しましょう。"
-                                    : "左上向きのくしゃみで送風機を作動し、右向きのくしゃみでシャフトへ。上昇中に右向きのくしゃみで左の出口から出て、クッションに着地しましょう。"
+                                    : level === 12
+                                      ? "左上向きのくしゃみで送風機を作動し、右向きのくしゃみでシャフトへ。上昇中に右向きのくしゃみで左の出口から出て、クッションに着地しましょう。"
+                                      : "右上向きのくしゃみで箱を右のカゴへ運びます。カゴが下がって昇降台が上端に着いたら、左下向きのくしゃみで右のクッションへ飛びましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -1151,7 +1269,9 @@ export default function Home() {
                                       ? "つぎはロープにつかまろう"
                                       : level === 11
                                         ? "つぎは上昇気流シャフトへ"
-                                        : "全レベル クリア！"}
+                                        : level === 12
+                                          ? "つぎはおもり式リフトへ"
+                                          : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (
@@ -1183,7 +1303,9 @@ export default function Home() {
         <p className="game-tip">
           {level === 12
             ? "ネコは歩けません。送風機を作動し、右向きのくしゃみで反動を使って上昇気流へ。上昇中もくしゃみを使えます。"
-            : "ネコは歩けません。くしゃみの向きと逆へ飛びます。"}
+            : level === 13
+              ? "ネコは歩けません。箱をカゴに入れると反対側の昇降台が上がります。台が上端に着いたら右へ飛びましょう。"
+              : "ネコは歩けません。くしゃみの向きと逆へ飛びます。"}
         </p>
       </div>
     </main>
