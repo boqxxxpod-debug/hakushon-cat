@@ -11,7 +11,7 @@ export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 export const ROPE_SNEEZE_SCALE = 0.45;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 export type Obstacle = {
   x: number;
@@ -68,6 +68,17 @@ export type Rope = {
   grabRadius: number;
 };
 
+export type Updraft = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  blowerX: number;
+  blowerY: number;
+  duration: number;
+  liftAcceleration: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -83,6 +94,7 @@ export type LevelDefinition = {
   breakableWalls: BreakableWall[];
   movingPlatforms: MovingPlatform[];
   ropes: Rope[];
+  updraft?: Updraft;
   hint: string;
 };
 
@@ -124,6 +136,8 @@ export type PhysicsState = {
   ropeAttached: number | null;
   ropeGrabCooldown: number;
   ropeEverGrabbed: boolean;
+  updraftTimeRemaining: number;
+  updraftEverActivated: boolean;
   goalHold: number;
 };
 
@@ -357,6 +371,38 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     }],
     hint: "ロープで右の足場へ！",
   },
+  12: {
+    id: 12,
+    cat: { x: 300, y: FLOOR_Y - CAT_R },
+    box: null,
+    balloon: null,
+    goal: { left: 72, right: 150, top: 316, bottom: 342 },
+    obstacles: [
+      { x: 158, y: 165, width: 14, height: 116 },
+      { x: 158, y: 380, width: 14, height: 140 },
+      { x: 256, y: 165, width: 14, height: 282 },
+      { x: 44, y: 367, width: 114, height: 20 },
+    ],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [],
+    movingPlatforms: [],
+    ropes: [],
+    updraft: {
+      x: 172,
+      y: 165,
+      width: 84,
+      height: 355,
+      blowerX: 280,
+      blowerY: 460,
+      duration: 4,
+      liftAcceleration: 1850,
+    },
+    hint: "送風機で上昇気流を起こせ！",
+  },
 };
 
 export function nextLevel(level: LevelId): LevelId | null {
@@ -370,6 +416,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 8) return 9;
   if (level === 9) return 10;
   if (level === 10) return 11;
+  if (level === 11) return 12;
   return null;
 }
 
@@ -427,6 +474,8 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     ropeAttached: null,
     ropeGrabCooldown: 0,
     ropeEverGrabbed: false,
+    updraftTimeRemaining: 0,
+    updraftEverActivated: false,
     goalHold: 0,
   };
 }
@@ -498,6 +547,21 @@ export function applySneeze(
     if (balloonDistance < 180 && coneDot > 0.76) {
       balloon.vx += dirX * (430 + 520 * power);
       balloon.vy += dirY * (330 + 420 * power) - 120 * power;
+      movedObject = true;
+    }
+  }
+
+  const updraft = LEVELS[world.level].updraft;
+  if (updraft) {
+    const toBlowerX = updraft.blowerX - world.cat.x;
+    const toBlowerY = updraft.blowerY - world.cat.y;
+    const blowerDistance = Math.hypot(toBlowerX, toBlowerY);
+    const coneDot = blowerDistance > 0
+      ? (toBlowerX * dirX + toBlowerY * dirY) / blowerDistance
+      : -1;
+    if (blowerDistance < 180 && coneDot >= 0.86) {
+      world.updraftTimeRemaining = updraft.duration;
+      world.updraftEverActivated = true;
       movedObject = true;
     }
   }
@@ -959,13 +1023,31 @@ export function releaseRope(world: PhysicsState) {
 
 export function stepPhysics(world: PhysicsState, dt: number) {
   movePlatformsAndCarry(world, dt);
+  world.updraftTimeRemaining = Math.max(0, world.updraftTimeRemaining - dt);
+  const updraft = LEVELS[world.level].updraft;
+  const catInUpdraft = Boolean(
+    updraft &&
+    world.updraftTimeRemaining > 0 &&
+    world.cat.x >= updraft.x &&
+    world.cat.x <= updraft.x + updraft.width &&
+    world.cat.y >= updraft.y &&
+    world.cat.y <= updraft.y + updraft.height
+  );
   const bodies = world.box ? [world.cat, world.box] : [world.cat];
   for (const body of bodies) {
-    body.vy += 1180 * dt;
+    const lift = body === world.cat && catInUpdraft && updraft
+      ? updraft.liftAcceleration
+      : 0;
+    body.vy += (1180 - lift) * dt;
     body.vx *= Math.pow(0.99, dt * 60);
     body.vy *= Math.pow(0.997, dt * 60);
     body.x += body.vx * dt;
     body.y += body.vy * dt;
+  }
+
+  if (updraft && world.cat.y < updraft.y + CAT_R) {
+    world.cat.y = updraft.y + CAT_R;
+    if (world.cat.vy < 0) world.cat.vy = 0;
   }
 
   collideWithFloorAndWalls(world.cat, CAT_R, 0, dt);
@@ -1005,6 +1087,7 @@ export function stepPhysics(world: PhysicsState, dt: number) {
     (world.level !== 6 || world.switchOn.every(Boolean)) &&
     (world.level !== 9 || world.wallBroken.every(Boolean)) &&
     (world.level !== 11 || (world.ropeEverGrabbed && world.ropeAttached === null)) &&
+    (world.level !== 12 || world.updraftEverActivated) &&
     isSeesawReady(world)
   );
   const restingOnCushion = goalUnlocked && isRestingOnCushion(world.cat, world.level);

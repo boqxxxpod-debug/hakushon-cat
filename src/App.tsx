@@ -256,7 +256,8 @@ export default function Home() {
         (world.level === 6 && !world.switchOn.every(Boolean)) ||
         (world.level === 8 && !isSeesawReady(world)) ||
         (world.level === 9 && !world.wallBroken.every(Boolean)) ||
-        (world.level === 11 && (!world.ropeEverGrabbed || world.ropeAttached !== null))
+        (world.level === 11 && (!world.ropeEverGrabbed || world.ropeAttached !== null)) ||
+        (world.level === 12 && !world.updraftEverActivated)
       );
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
@@ -268,6 +269,43 @@ export default function Home() {
 
       ctx.fillStyle = "rgba(255,255,255,.55)";
       for (let y = 138; y < FLOOR_Y - 10; y += 56) ctx.fillRect(22, y, 316, 2);
+
+      const updraft = definition.updraft;
+      const airflowActive = world.updraftTimeRemaining > 0;
+      if (updraft) {
+        const airflowGradient = ctx.createLinearGradient(0, updraft.y, 0, updraft.y + updraft.height);
+        airflowGradient.addColorStop(0, airflowActive ? "rgba(73, 199, 240, .32)" : "rgba(73, 199, 240, .12)");
+        airflowGradient.addColorStop(0.5, airflowActive ? "rgba(73, 199, 240, .22)" : "rgba(73, 199, 240, .07)");
+        airflowGradient.addColorStop(1, airflowActive ? "rgba(73, 199, 240, .34)" : "rgba(73, 199, 240, .13)");
+        ctx.fillStyle = airflowGradient;
+        ctx.fillRect(updraft.x, updraft.y, updraft.width, updraft.height);
+        ctx.save();
+        ctx.strokeStyle = airflowActive ? "rgba(29, 146, 190, .85)" : "rgba(29, 146, 190, .45)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([7, 7]);
+        ctx.strokeRect(updraft.x, updraft.y, updraft.width, updraft.height);
+        ctx.restore();
+        if (airflowActive) {
+          const arrowOffset = (world.platformTime * 42) % 76;
+          for (const x of [updraft.x + 24, updraft.x + updraft.width - 24]) {
+            for (let y = updraft.y + updraft.height - 18 - arrowOffset; y > updraft.y + 42; y -= 76) {
+              drawArrow(ctx, x, y, x, y - 30, "rgba(25, 142, 188, .8)", 4);
+            }
+          }
+          roundedRect(ctx, updraft.x + 9, updraft.y + 8, updraft.width - 18, 23, 11);
+          ctx.fillStyle = "rgba(25, 109, 145, .9)";
+          ctx.fill();
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "800 12px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(`上昇気流 ${world.updraftTimeRemaining.toFixed(1)}秒`, updraft.x + updraft.width / 2, updraft.y + 20);
+        } else {
+          ctx.fillStyle = "rgba(29, 111, 145, .72)";
+          ctx.font = "800 12px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("上昇気流の通り道", updraft.x + updraft.width / 2, updraft.y + 52);
+        }
+      }
 
       ctx.fillStyle = "#28344f";
       roundedRect(ctx, 24, 20, 312, 50, 20);
@@ -596,6 +634,8 @@ export default function Home() {
                   ? "カベ待ち"
                   : world.level === 11
                     ? (world.ropeAttached !== null ? "はなして着地" : "ロープ待ち")
+                    : world.level === 12
+                      ? "送風機待ち"
                   : "ふうせん待ち")
           : "おひるね",
         goalX + goalWidth / 2,
@@ -612,6 +652,37 @@ export default function Home() {
         ctx.fillStyle = "rgba(255,255,255,.22)";
         roundedRect(ctx, obstacle.x + 7, obstacle.y + 9, 7, obstacle.height - 18, 4);
         ctx.fill();
+      }
+
+      if (updraft) {
+        const blowerOn = world.updraftTimeRemaining > 0;
+        ctx.save();
+        ctx.shadowColor = blowerOn ? "rgba(55, 181, 220, .48)" : "rgba(40, 55, 80, .24)";
+        ctx.shadowBlur = blowerOn ? 14 : 6;
+        roundedRect(ctx, updraft.blowerX - 21, updraft.blowerY - 18, 42, 36, 10);
+        ctx.fillStyle = blowerOn ? "#5bc9e7" : "#68748c";
+        ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = "#28344f";
+        ctx.lineWidth = 3;
+        roundedRect(ctx, updraft.blowerX - 21, updraft.blowerY - 18, 42, 36, 10);
+        ctx.stroke();
+        ctx.fillStyle = "#fffaf0";
+        ctx.beginPath();
+        ctx.arc(updraft.blowerX, updraft.blowerY, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = blowerOn ? "#2184a6" : "#59657c";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(updraft.blowerX - 7, updraft.blowerY);
+        ctx.lineTo(updraft.blowerX + 7, updraft.blowerY);
+        ctx.moveTo(updraft.blowerX, updraft.blowerY - 7);
+        ctx.lineTo(updraft.blowerX, updraft.blowerY + 7);
+        ctx.stroke();
+        ctx.fillStyle = blowerOn ? "#176b85" : "#505a70";
+        ctx.font = "900 10px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(blowerOn ? "ON" : "送風機", updraft.blowerX, updraft.blowerY - 28);
       }
 
       if (world.box) {
@@ -730,10 +801,13 @@ export default function Home() {
       const showLevelElevenGuide = world.level === 11 && (
         !world.ropeEverGrabbed || world.ropeAttached !== null
       );
+      const showLevelTwelveGuide = world.level === 12 && (
+        !world.updraftEverActivated || (!airflowActive && world.cat.y > 260)
+      );
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide || showLevelTwelveGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -746,9 +820,10 @@ export default function Home() {
         const isLevelNine = world.level === 9;
         const isLevelTen = world.level === 10;
         const isLevelEleven = world.level === 11;
+        const isLevelTwelve = world.level === 12;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven || isLevelTwelve ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -862,6 +937,25 @@ export default function Home() {
           ctx.fillStyle = "#26334d";
           ctx.fillText(
             holdingRope ? "② ネコをタップしてはなす" : "近づくと自動でつかまる！",
+            180,
+            187,
+          );
+        } else if (isLevelTwelve) {
+          const catInShaft = Boolean(
+            updraft && world.cat.x >= updraft.x && world.cat.x <= updraft.x + updraft.width
+          );
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = airflowActive ? "#1683a9" : "#26334d";
+          ctx.fillText(
+            airflowActive ? "上昇中！" : "① 左上へ → 送風機ON",
+            180,
+            158,
+          );
+          ctx.fillStyle = airflowActive ? "#26334d" : "#59657c";
+          ctx.fillText(
+            airflowActive
+              ? (catInShaft ? "右へくしゃみ → 左の出口へ" : "右へくしゃみ → シャフトへ")
+              : "② 右へくしゃみ → シャフトへ",
             180,
             187,
           );
@@ -987,7 +1081,9 @@ export default function Home() {
                                 ? "右へ長くドラッグし、箱を十分に加速して壁へぶつけます。壁が壊れたら左下へ長くドラッグし、反動で開いた通路を抜けましょう。"
                                 : level === 10
                                   ? "ネコは水色の足場に乗ったまま運ばれます。足場が右端へ近づいた瞬間に左下へ短くドラッグし、反動で右上のクッションへ着地しましょう。"
-                                  : "左下へ長くドラッグしてロープへ飛び、近づくと自動でつかまります。右へ揺れたらネコをタップしてロープを離すか、画面下のボタンで離して高いクッションへ着地しましょう。"
+                                  : level === 11
+                                    ? "左下へ長くドラッグしてロープへ飛び、近づくと自動でつかまります。右へ揺れたらネコをタップしてロープを離すか、画面下のボタンで離して高いクッションへ着地しましょう。"
+                                    : "左上向きのくしゃみで送風機を作動し、右向きのくしゃみでシャフトへ。上昇中に右向きのくしゃみで左の出口から出て、クッションに着地しましょう。"
             }
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -1053,7 +1149,9 @@ export default function Home() {
                                     ? "つぎは動く足場へ"
                                     : level === 10
                                       ? "つぎはロープにつかまろう"
-                                      : "全レベル クリア！"}
+                                      : level === 11
+                                        ? "つぎは上昇気流シャフトへ"
+                                        : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (
@@ -1082,7 +1180,11 @@ export default function Home() {
           </div>
         </div>
 
-        <p className="game-tip">ネコは歩けません。くしゃみの向きと逆へ飛びます。</p>
+        <p className="game-tip">
+          {level === 12
+            ? "ネコは歩けません。送風機を作動し、右向きのくしゃみで反動を使って上昇気流へ。上昇中もくしゃみを使えます。"
+            : "ネコは歩けません。くしゃみの向きと逆へ飛びます。"}
+        </p>
       </div>
     </main>
   );
