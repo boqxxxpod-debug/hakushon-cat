@@ -11,7 +11,7 @@ export const CAT_GROUND_FRICTION = 1500;
 export const CAT_ICE_FRICTION = 90;
 export const ROPE_SNEEZE_SCALE = 0.45;
 
-export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+export type LevelId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
 
 export type Obstacle = {
   x: number;
@@ -120,6 +120,16 @@ export type WaterElevator = {
   valveRadius: number;
 };
 
+export type GravityZone = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  switchX: number;
+  switchY: number;
+  switchRadius: number;
+};
+
 export type LevelDefinition = {
   id: LevelId;
   cat: Pick<Body, "x" | "y">;
@@ -139,6 +149,7 @@ export type LevelDefinition = {
   weightedLift?: WeightedLift;
   ratchetLift?: RatchetLift;
   waterElevator?: WaterElevator;
+  gravityZone?: GravityZone;
   hint: string;
 };
 
@@ -193,6 +204,8 @@ export type PhysicsState = {
   waterPlatformY: number;
   waterFilling: boolean;
   waterValveEverActivated: boolean;
+  gravityReversed: boolean;
+  gravitySwitchEverActivated: boolean;
   goalHold: number;
 };
 
@@ -556,6 +569,35 @@ export const LEVELS: Record<LevelId, LevelDefinition> = {
     },
     hint: "バルブで水位を上げよう！",
   },
+  16: {
+    id: 16,
+    cat: { x: 150, y: FLOOR_Y - CAT_R },
+    box: { x: 245, y: FLOOR_Y - BOX_HALF },
+    balloon: null,
+    goal: { left: 300, right: 330, top: 269, bottom: 287 },
+    obstacles: [
+      { x: 44, y: 170, width: 248, height: 16 },
+      { x: 252, y: 305, width: 90, height: 16 },
+    ],
+    iceZones: [],
+    springs: [],
+    switches: [],
+    gates: [],
+    seesaws: [],
+    breakableWalls: [],
+    movingPlatforms: [],
+    ropes: [],
+    gravityZone: {
+      x: 44,
+      y: 186,
+      width: 248,
+      height: FLOOR_Y - 186,
+      switchX: 100,
+      switchY: 350,
+      switchRadius: 24,
+    },
+    hint: "重力を反転して天井へ！",
+  },
 };
 
 export function nextLevel(level: LevelId): LevelId | null {
@@ -573,6 +615,7 @@ export function nextLevel(level: LevelId): LevelId | null {
   if (level === 12) return 13;
   if (level === 13) return 14;
   if (level === 14) return 15;
+  if (level === 15) return 16;
   return null;
 }
 
@@ -646,6 +689,8 @@ export function freshPhysics(level: LevelId = 1): PhysicsState {
     waterPlatformY: waterElevator?.initialWaterY ?? 0,
     waterFilling: false,
     waterValveEverActivated: false,
+    gravityReversed: false,
+    gravitySwitchEverActivated: false,
     goalHold: 0,
   };
 }
@@ -737,6 +782,38 @@ function activateWaterValve(world: PhysicsState, dirX: number, dirY: number) {
   return true;
 }
 
+function activateGravitySwitch(world: PhysicsState, dirX: number, dirY: number) {
+  const zone = LEVELS[world.level].gravityZone;
+  if (!zone) return false;
+
+  const toSwitchX = zone.switchX - world.cat.x;
+  const toSwitchY = zone.switchY - world.cat.y;
+  const distance = Math.hypot(toSwitchX, toSwitchY);
+  const coneDot = distance > 0
+    ? (toSwitchX * dirX + toSwitchY * dirY) / distance
+    : -1;
+  if (distance >= 210 || coneDot < 0.86) return false;
+
+  world.gravityReversed = !world.gravityReversed;
+  world.gravitySwitchEverActivated = true;
+  return true;
+}
+
+export function isBodyInGravityZone(world: PhysicsState, body: Body) {
+  const zone = LEVELS[world.level].gravityZone;
+  return Boolean(
+    zone &&
+    body.x >= zone.x &&
+    body.x <= zone.x + zone.width &&
+    body.y >= zone.y &&
+    body.y <= zone.y + zone.height
+  );
+}
+
+export function gravityDirectionForBody(world: PhysicsState, body: Body): -1 | 1 {
+  return world.gravityReversed && isBodyInGravityZone(world, body) ? -1 : 1;
+}
+
 export function applySneeze(
   world: PhysicsState,
   dirX: number,
@@ -746,6 +823,7 @@ export function applySneeze(
   const velocity = sneezeVelocity(dirX, dirY, power);
   const ratchetActivated = activateRatchetLift(world, dirX, dirY);
   const waterValveActivated = activateWaterValve(world, dirX, dirY);
+  const gravitySwitchActivated = activateGravitySwitch(world, dirX, dirY);
   const recoilScale = world.ropeAttached === null ? 1 : ROPE_SNEEZE_SCALE;
   world.cat.vx += velocity.vx * recoilScale;
   world.cat.vy += velocity.vy * recoilScale;
@@ -796,7 +874,7 @@ export function applySneeze(
     }
   }
 
-  return movedObject || ratchetActivated || waterValveActivated;
+  return movedObject || ratchetActivated || waterValveActivated || gravitySwitchActivated;
 }
 
 function collideWithFloorAndWalls(
@@ -937,6 +1015,15 @@ function resolveBodyObstacle(body: Body, radius: number, obstacle: Obstacle) {
     body.vy -= intoSurface * dy * 1.18;
   }
   return dy < -0.7;
+}
+
+function bodyTouchingObstacleUnderside(body: Body, radius: number, obstacle: Obstacle) {
+  const underside = obstacle.y + obstacle.height;
+  return (
+    body.x >= obstacle.x - radius * 0.35 &&
+    body.x <= obstacle.x + obstacle.width + radius * 0.35 &&
+    Math.abs(body.y - radius - underside) <= 3.5
+  );
 }
 
 function obstacleImpactSpeed(body: Body, radius: number, obstacle: Obstacle) {
@@ -1412,10 +1499,11 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   );
   const bodies = world.box ? [world.cat, world.box] : [world.cat];
   for (const body of bodies) {
-    const lift = body === world.cat && catInUpdraft && updraft
+    const direction = gravityDirectionForBody(world, body);
+    const lift = direction === 1 && body === world.cat && catInUpdraft && updraft
       ? updraft.liftAcceleration
       : 0;
-    body.vy += (1180 - lift) * dt;
+    body.vy += (1180 * direction - lift) * dt;
     body.vx *= Math.pow(0.99, dt * 60);
     body.vy *= Math.pow(0.997, dt * 60);
     body.x += body.vx * dt;
@@ -1445,11 +1533,36 @@ export function stepPhysics(world: PhysicsState, dt: number) {
   resolveCatBalloon(world);
 
   let catOnPlatform = false;
+  let catOnCeiling = false;
+  let boxOnCeiling = false;
+  const catGravityDirection = gravityDirectionForBody(world, world.cat);
+  const boxGravityDirection = world.box ? gravityDirectionForBody(world, world.box) : 1;
   for (const obstacle of world.obstacles) {
     catOnPlatform = resolveBodyObstacle(world.cat, CAT_R, obstacle) || catOnPlatform;
-    if (world.box) resolveBodyObstacle(world.box, BOX_HALF, obstacle);
+    if (
+      catGravityDirection === -1 &&
+      bodyTouchingObstacleUnderside(world.cat, CAT_R, obstacle)
+    ) {
+      catOnCeiling = true;
+    }
+    if (world.box) {
+      resolveBodyObstacle(world.box, BOX_HALF, obstacle);
+      if (
+        boxGravityDirection === -1 &&
+        bodyTouchingObstacleUnderside(world.box, BOX_HALF, obstacle)
+      ) {
+        boxOnCeiling = true;
+      }
+    }
   }
-  if (catOnPlatform) world.cat.vx = applyGroundFriction(world.cat.vx, dt);
+  if (catOnPlatform || catOnCeiling) {
+    world.cat.vx = applyGroundFriction(world.cat.vx, dt);
+    if (catOnCeiling && world.cat.vy < 28) world.cat.vy = 0;
+  }
+  if (world.box && boxOnCeiling) {
+    world.box.vx = approach(world.box.vx, 0, 520 * dt);
+    if (world.box.vy < 28) world.box.vy = 0;
+  }
 
   stepSprings(world);
   stepSwitches(world);
@@ -1479,6 +1592,10 @@ export function stepPhysics(world: PhysicsState, dt: number) {
     (world.level !== 15 || (
       world.waterValveEverActivated &&
       world.waterSurfaceY <= LEVELS[15].waterElevator!.highWaterY + 0.5
+    )) &&
+    (world.level !== 16 || (
+      world.gravitySwitchEverActivated &&
+      !world.gravityReversed
     )) &&
     isSeesawReady(world)
   );

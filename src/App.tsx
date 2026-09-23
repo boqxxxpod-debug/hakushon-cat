@@ -211,6 +211,12 @@ export default function Home() {
       const launchSpeed = (320 + 210 * power) * recoilScale;
       const vx = -dirX * launchSpeed;
       const vy = -dirY * (260 + 160 * power) * recoilScale;
+      const previewZone = LEVELS[world.level].gravityZone;
+      const previewGravity = world.gravityReversed && previewZone &&
+        cat.x >= previewZone.x && cat.x <= previewZone.x + previewZone.width &&
+        cat.y >= previewZone.y && cat.y <= previewZone.y + previewZone.height
+        ? -1180
+        : 1180;
       ctx.fillStyle = "rgba(246, 188, 50, 0.72)";
       if (world.ropeAttached !== null) {
         const rope = world.ropes[world.ropeAttached];
@@ -229,7 +235,7 @@ export default function Home() {
         for (let i = 1; i <= 8; i += 1) {
           const t = i * 0.105;
           const px = cat.x + vx * t;
-          const py = cat.y + vy * t + 0.5 * 1180 * t * t;
+          const py = cat.y + vy * t + 0.5 * previewGravity * t * t;
           if (px < LEFT_WALL || px > RIGHT_WALL || py > FLOOR_Y) break;
           ctx.beginPath();
           ctx.arc(px, py, Math.max(2.4, 5 - i * 0.32), 0, Math.PI * 2);
@@ -254,6 +260,7 @@ export default function Home() {
       const weightedLift = definition.weightedLift;
       const ratchetLift = definition.ratchetLift;
       const waterElevator = definition.waterElevator;
+      const gravityZone = definition.gravityZone;
       const ratchetStopCount = ratchetLift?.platformStops.length ?? 0;
       const ratchetAtTop = world.ratchetStage === 0;
       const waterAtTop = Boolean(
@@ -274,7 +281,8 @@ export default function Home() {
         (world.level === 12 && !world.updraftEverActivated) ||
         (world.level === 13 && (!world.liftBoxLoaded || !liftAtTop)) ||
         (world.level === 14 && (!world.ratchetEverActivated || !ratchetAtTop)) ||
-        (world.level === 15 && (!world.waterValveEverActivated || !waterAtTop))
+        (world.level === 15 && (!world.waterValveEverActivated || !waterAtTop)) ||
+        (world.level === 16 && (!world.gravitySwitchEverActivated || world.gravityReversed))
       );
       const goalLockLabel = world.level === 6
         ? "スイッチ待ち"
@@ -294,7 +302,9 @@ export default function Home() {
                         : "ハンドル待ち")
                     : world.level === 15
                       ? (waterAtTop ? "高台へ" : "バルブ待ち")
-                    : "ふうせん待ち";
+                      : world.level === 16
+                        ? (world.gravityReversed ? "重力を戻して" : "右の足場へ")
+                        : "ふうせん待ち";
       ctx.clearRect(0, 0, WORLD_W, WORLD_H);
 
       const background = ctx.createLinearGradient(0, 0, 0, WORLD_H);
@@ -362,6 +372,65 @@ export default function Home() {
       ctx.fillRect(LEFT_WALL, FLOOR_Y, RIGHT_WALL - LEFT_WALL, 8);
       ctx.fillStyle = "rgba(100, 67, 42, .15)";
       for (let x = 38; x < RIGHT_WALL; x += 64) ctx.fillRect(x, FLOOR_Y + 16, 2, 28);
+
+      if (gravityZone) {
+        const reversed = world.gravityReversed;
+        ctx.fillStyle = reversed ? "rgba(145, 100, 232, .16)" : "rgba(83, 169, 223, .10)";
+        ctx.fillRect(gravityZone.x, gravityZone.y, gravityZone.width, gravityZone.height);
+        ctx.save();
+        ctx.strokeStyle = reversed ? "rgba(112, 69, 205, .82)" : "rgba(45, 130, 184, .62)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.strokeRect(gravityZone.x, gravityZone.y, gravityZone.width, gravityZone.height);
+        ctx.restore();
+
+        const arrowColor = reversed ? "rgba(112, 69, 205, .86)" : "rgba(45, 130, 184, .72)";
+        for (const x of [gravityZone.x + 46, gravityZone.x + gravityZone.width / 2, gravityZone.x + gravityZone.width - 46]) {
+          for (const y of [gravityZone.y + 72, gravityZone.y + 166, gravityZone.y + 260]) {
+            drawArrow(
+              ctx,
+              x,
+              y + (reversed ? 16 : -16),
+              x,
+              y + (reversed ? -16 : 16),
+              arrowColor,
+              3,
+            );
+          }
+        }
+
+        roundedRect(ctx, gravityZone.x + 12, gravityZone.y + 10, 108, 25, 12);
+        ctx.fillStyle = reversed ? "rgba(88, 54, 166, .9)" : "rgba(37, 111, 154, .86)";
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "800 12px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          reversed ? "重力 ↑ 反転中" : "重力 ↓ 通常",
+          gravityZone.x + 66,
+          gravityZone.y + 23,
+        );
+
+        ctx.save();
+        ctx.shadowColor = reversed ? "rgba(135, 94, 235, .56)" : "rgba(58, 151, 207, .45)";
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = reversed ? "#8a63df" : "#4fa8d5";
+        ctx.strokeStyle = "#26334d";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(gravityZone.switchX, gravityZone.switchY, gravityZone.switchRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "900 24px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(reversed ? "↑" : "↓", gravityZone.switchX, gravityZone.switchY - 1);
+        ctx.font = "800 9px system-ui, sans-serif";
+        ctx.fillText("切替", gravityZone.switchX, gravityZone.switchY + 13);
+        ctx.restore();
+      }
 
       if (waterElevator) {
         const waterGradient = ctx.createLinearGradient(
@@ -1124,10 +1193,11 @@ export default function Home() {
       const showLevelFifteenGuide = world.level === 15 && (
         !world.waterValveEverActivated || !waterAtTop || shotsRef.current < 2
       );
+      const showLevelSixteenGuide = world.level === 16;
       if (
         !aimRef.current.active &&
         statusRef.current === "playing" &&
-        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide || showLevelTwelveGuide || showLevelThirteenGuide || showLevelFourteenGuide || showLevelFifteenGuide)
+        (shotsRef.current === 0 || showLevelOneGuide || showLevelTwoGuide || showLevelThreeGuide || showLevelFourGuide || showLevelFiveGuide || showLevelSixGuide || showLevelSevenGuide || showLevelEightGuide || showLevelNineGuide || showLevelTenGuide || showLevelElevenGuide || showLevelTwelveGuide || showLevelThirteenGuide || showLevelFourteenGuide || showLevelFifteenGuide || showLevelSixteenGuide)
       ) {
         const isLevelOne = world.level === 1;
         const isLevelTwo = world.level === 2;
@@ -1144,9 +1214,10 @@ export default function Home() {
         const isLevelThirteen = world.level === 13;
         const isLevelFourteen = world.level === 14;
         const isLevelFifteen = world.level === 15;
+        const isLevelSixteen = world.level === 16;
         const movedBoxAside = world.box !== null && world.box.x <= 100;
         const switchIsOn = world.switchOn.every(Boolean);
-        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven || isLevelTwelve || isLevelThirteen || isLevelFourteen || isLevelFifteen ? 82 : 70, 18);
+        roundedRect(ctx, 39, 132, 282, isLevelOne || isLevelTwo || isLevelThree || isLevelFour || isLevelFive || isLevelSix || isLevelSeven || isLevelEight || isLevelNine || isLevelTen || isLevelEleven || isLevelTwelve || isLevelThirteen || isLevelFourteen || isLevelFifteen || isLevelSixteen ? 82 : 70, 18);
         ctx.fillStyle = "rgba(255,255,255,.92)";
         ctx.fill();
         ctx.fillStyle = "#26334d";
@@ -1336,6 +1407,27 @@ export default function Home() {
             waterAtTop
               ? "左下へ長く → 右の高台へ"
               : "給水・排水で高さが変わる！",
+            180,
+            187,
+          );
+        } else if (isLevelSixteen && gravityZone) {
+          const nearCeiling = world.cat.y <= gravityZone.y + 70;
+          ctx.font = "800 15px system-ui, sans-serif";
+          ctx.fillStyle = world.gravityReversed ? "#7045cd" : world.gravitySwitchEverActivated ? "#28794f" : "#26334d";
+          ctx.fillText(
+            !world.gravitySwitchEverActivated
+              ? "① 左上の切替スイッチへくしゃみ"
+              : world.gravityReversed
+                ? (nearCeiling ? "② 天井を足場に右へ！" : "重力↑ 天井まで上がろう")
+                : "③ 重力↓ 右の足場へ着地",
+            180,
+            158,
+          );
+          ctx.fillStyle = "#59657c";
+          ctx.fillText(
+            world.gravityReversed
+              ? "天井側でも同じスイッチで戻せる"
+              : "反転は色付きエリアの中だけ！",
             180,
             187,
           );
@@ -1543,7 +1635,9 @@ export default function Home() {
                                           ? "つぎはラチェット式昇降台へ"
                                           : level === 14
                                             ? "つぎは水位エレベーターへ"
-                                            : "全レベル クリア！"}
+                                            : level === 15
+                                              ? "つぎは重力反転エリアへ"
+                                              : "全レベル クリア！"}
                 </p>
                 <span className="win-sleep" aria-hidden="true">Z z z ...</span>
                 {nextLevel(level) !== null ? (
@@ -1573,9 +1667,11 @@ export default function Home() {
         </div>
 
         <p className="game-tip">
-          {level === 15
-            ? "左側のバルブにくしゃみを当てると給水／排水が切り替わります。水位は上下限の間を一定速度で動き、浮き台とその上のネコだけが一緒に上下します。"
-            : level === 12
+          {level === 16
+            ? "色付きエリア内だけ重力が切り替わります。スイッチへくしゃみして天井へ移動し、天井側でもう一度切り替えて通常重力に戻し、右の足場へ着地しましょう。"
+            : level === 15
+              ? "左側のバルブにくしゃみを当てると給水／排水が切り替わります。水位は上下限の間を一定速度で動き、浮き台とその上のネコだけが一緒に上下します。"
+              : level === 12
             ? "ネコは歩けません。送風機を作動し、右向きのくしゃみで反動を使って上昇気流へ。上昇中もくしゃみを使えます。"
             : level === 13
               ? "ネコは歩けません。箱をカゴに入れると反対側の昇降台が上がります。台が上端に着いたら右へ飛びましょう。"

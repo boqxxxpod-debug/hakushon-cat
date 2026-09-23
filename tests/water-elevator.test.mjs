@@ -33,7 +33,8 @@ test("Level 15 starts with the cat on a low bounded float and follows Level 14",
 
   assert.ok(elevator);
   assert.equal(nextLevel(14), 15);
-  assert.equal(nextLevel(15), null);
+  assert.equal(nextLevel(15), 16);
+  assert.equal(nextLevel(16), null);
   assert.deepEqual(world.cat, { x: 160, y: 475, vx: 0, vy: 0 });
   assert.equal(world.waterSurfaceY, elevator.lowWaterY);
   assert.equal(world.waterPlatformY, elevator.lowWaterY);
