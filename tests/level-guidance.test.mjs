@@ -100,6 +100,17 @@ test("level twelve explains how to activate, enter, and exit the updraft shaft",
   assert.match(appSource, /上昇中に右向きのくしゃみで左の出口から出て[\s\S]*クッションに着地/);
 });
 
+test("level thirteen explains the weighted lift, box loading, and landing route", () => {
+  assert.match(appSource, /world\.level === 13 && \([\s\S]*!world\.liftBoxLoaded[\s\S]*liftAtTop/);
+  assert.match(appSource, /① 右上へくしゃみ → 箱をカゴへ/);
+  assert.match(appSource, /カゴが下がって上昇中/);
+  assert.match(appSource, /左下へくしゃみ → 右のクッション/);
+  assert.match(appSource, /level === 13[\s\S]*箱をカゴに入れると反対側の昇降台が上がります/);
+  assert.match(appSource, /右上向きのくしゃみで箱を右のカゴへ運びます[\s\S]*左下向きのくしゃみで右のクッション/);
+  assert.match(appSource, /LEVEL \$\{world\.level\}/);
+  assert.match(appSource, /aria-label={`ハクション・キャット Level \$\{level\}`}/);
+});
+
 test("the clear messages lead into the next stage before final completion", () => {
-  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*つぎはロープにつかまろう[\s\S]*つぎは上昇気流シャフトへ[\s\S]*全レベル クリア！/);
+  assert.match(appSource, /level === 1[\s\S]*つぎは箱をどかそう[\s\S]*つぎは氷で滑ろう[\s\S]*つぎはバネでジャンプ[\s\S]*つぎは風船を飛ばそう[\s\S]*つぎはスイッチON[\s\S]*つぎはゲートを開けよう[\s\S]*つぎはシーソーで登ろう[\s\S]*つぎは壁を壊そう[\s\S]*つぎは動く足場へ[\s\S]*つぎはロープにつかまろう[\s\S]*つぎは上昇気流シャフトへ[\s\S]*つぎはおもり式リフトへ[\s\S]*全レベル クリア！/);
 });

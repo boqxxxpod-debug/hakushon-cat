@@ -29,7 +29,7 @@ test("Level 12 defines a bounded updraft shaft, blower, exit, and raised cushion
   const world = freshPhysics(12);
 
   assert.equal(nextLevel(11), 12);
-  assert.equal(nextLevel(12), null);
+  assert.equal(nextLevel(12), 13);
   assert.deepEqual(world.cat, { x: 300, y: FLOOR_Y - CAT_R, vx: 0, vy: 0 });
   assert.deepEqual(level.goal, { left: 72, right: 150, top: 316, bottom: 342 });
   assert.deepEqual(level.updraft, {
