@@ -36,7 +36,8 @@ test("Level 13 starts with the cat on a bounded lift and the box beside its bask
   assert.ok(lift);
   assert.equal(nextLevel(12), 13);
   assert.equal(nextLevel(13), 14);
-  assert.equal(nextLevel(14), null);
+  assert.equal(nextLevel(14), 15);
+  assert.equal(nextLevel(15), null);
   assert.deepEqual(world.cat, { x: 92, y: 425, vx: 0, vy: 0 });
   assert.deepEqual(world.box, { x: 100, y: 339, vx: 0, vy: 0 });
   assert.deepEqual(LEVELS[13].goal, { left: 160, right: 235, top: 245, bottom: 270 });
